@@ -50,7 +50,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     rows.slice(1)
                         .map(row => ({
                             name: String(row[columnIndex] || '').trim(),
-                            number: row[columnIndex - 1]
+                            number: String(row[columnIndex - 1] ?? '').trim()
                         }))
                         .filter(entry =>
                             entry.name !== '' && entry.name.toLowerCase() !== 'nama'
@@ -62,15 +62,16 @@ document.addEventListener('DOMContentLoaded', () => {
                     return;
                 }
 
-                const hasSequentialNumbers = nameEntries.every(entry =>
+                const hasValidNumbers = nameEntries.every(entry =>
                     entry.number !== '' && Number.isFinite(Number(entry.number))
                 );
-                if (hasSequentialNumbers) {
-                    nameEntries.sort((a, b) => Number(a.number) - Number(b.number));
+                if (!hasValidNumbers) {
+                    alert('Pastikan setiap nama memiliki nomor yang valid pada kolom "No".');
+                    return;
                 }
 
-                const names = nameEntries.map(entry => entry.name);
-                await processData(names);
+                nameEntries.sort((a, b) => Number(a.number) - Number(b.number));
+                await processData(nameEntries);
 
             } catch (error) {
                 console.error("Error membaca Excel:", error);
@@ -83,12 +84,12 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsArrayBuffer(file);
     });
 
-    async function processData(names) {
+    async function processData(entries) {
         progressContainer.classList.remove('hidden');
-        const total = names.length;
+        const total = entries.length;
         
         for (let i = 0; i < total; i++) {
-            const nama = names[i];
+            const { name, number } = entries[i];
             const mainCanvas = document.createElement('canvas');
             mainCanvas.width = 1063;
             mainCanvas.height = 236;
@@ -101,25 +102,27 @@ document.addEventListener('DOMContentLoaded', () => {
             ctx.textBaseline = 'middle';
 
             const fontFamily = '"Arial", "Microsoft YaHei", sans-serif';
-            const maxFontSize = 88;
+            const label = `${number}. ${name}`;
+            const maxFontSize = 76;
             const maxTextWidth = mainCanvas.width - 100;
             ctx.font = `700 ${maxFontSize}px ${fontFamily}`;
-            const measuredWidth = ctx.measureText(nama).width;
+            const measuredWidth = ctx.measureText(label).width;
             const fontSize = measuredWidth > maxTextWidth
                 ? maxFontSize * maxTextWidth / measuredWidth
                 : maxFontSize;
             ctx.font = `700 ${fontSize}px ${fontFamily}`;
-            ctx.fillText(nama, mainCanvas.width / 2, mainCanvas.height / 2);
+            ctx.fillText(label, mainCanvas.width / 2, mainCanvas.height / 2);
 
             const canvasBlob = await new Promise(resolve => mainCanvas.toBlob(resolve, 'image/png'));
             if (!canvasBlob) {
-                throw new Error(`Gagal membuat gambar untuk nama "${nama}".`);
+                throw new Error(`Gagal membuat gambar untuk nama "${name}".`);
             }
             const stickerBlob = await setPngResolution(canvasBlob, 300);
             zip.file(`Stiker_${String(i + 1).padStart(3, '0')}.png`, stickerBlob);
 
             const previewImg = document.createElement('img');
             previewImg.className = 'preview-card';
+            previewImg.alt = `Nomor ${number}: ${name}`;
             previewImg.src = mainCanvas.toDataURL('image/png');
             previewGrid.appendChild(previewImg);
 
@@ -217,7 +220,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const url = URL.createObjectURL(content);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'Export_Stiker_Nama.zip';
+            a.download = 'Export_Stiker_Nama_dan_Nomor.zip';
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
