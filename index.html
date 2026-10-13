@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Generator Stiker Nama</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Generator Stiker Nama</h1>
+            <p>Buat stiker nama ukuran 9×2 cm secara otomatis dan offline.</p>
+        </header>
+
+        <div class="controls-panel">
+            <div class="input-group">
+                <label for="excel-upload" class="upload-btn">📂 Pilih File Excel</label>
+                <input type="file" id="excel-upload" accept=".xlsx, .xls">
+                <span id="file-name">Belum ada file terpilih</span>
+            </div>
+            <button id="download-btn" disabled>💾 Download Semua (ZIP)</button>
+        </div>
+
+        <div id="progress-container" class="hidden">
+            <div class="progress-stats">
+                <span id="progress-text">Memproses: 0 / 0</span>
+                <span id="progress-percentage">0%</span>
+            </div>
+            <div class="progress-bar-bg">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+        </div>
+
+        <div class="preview-section">
+            <h3>Preview Hasil:</h3>
+            <div id="preview-grid" class="preview-grid"></div>
+        </div>
+    </div>
+
+    <script src="assets/xlsx.full.min.js"></script>
+    <script src="assets/jszip.min.js"></script>
+
+    <script src="script.js"></script>
+</body>
+</html>
