@@ -7,13 +7,33 @@ document.addEventListener('DOMContentLoaded', () => {
     const progressText = document.getElementById('progress-text');
     const progressPercentage = document.getElementById('progress-percentage');
     const previewGrid = document.getElementById('preview-grid');
+    const backgroundColorInput = document.getElementById('background-color');
+    const textColorInput = document.getElementById('text-color');
 
     let zip = new JSZip();
+    let entriesToProcess = [];
+    let generationId = 0;
+
+    const regenerateStickers = async () => {
+        if (entriesToProcess.length === 0) return;
+
+        try {
+            await processData(entriesToProcess);
+        } catch (error) {
+            console.error('Error membuat stiker:', error);
+            alert(`Gagal membuat stiker: ${error.message || error}`);
+        }
+    };
+
+    backgroundColorInput.addEventListener('change', regenerateStickers);
+    textColorInput.addEventListener('change', regenerateStickers);
 
     fileInput.addEventListener('change', async (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
+        generationId++;
+        entriesToProcess = [];
         fileNameDisplay.textContent = file.name;
         downloadBtn.disabled = true;
         previewGrid.innerHTML = '';
@@ -71,6 +91,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
 
                 nameEntries.sort((a, b) => Number(a.number) - Number(b.number));
+                entriesToProcess = nameEntries;
                 await processData(nameEntries);
 
             } catch (error) {
@@ -85,19 +106,31 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     async function processData(entries) {
+        const currentGenerationId = ++generationId;
+        const backgroundColor = backgroundColorInput.value;
+        const textColor = textColorInput.value;
+
+        zip = new JSZip();
+        previewGrid.innerHTML = '';
         progressContainer.classList.remove('hidden');
+        progressBar.style.width = '0%';
+        progressText.textContent = `Memproses: 0 / ${entries.length}`;
+        progressPercentage.textContent = '0%';
+        downloadBtn.disabled = true;
         const total = entries.length;
         
         for (let i = 0; i < total; i++) {
+            if (currentGenerationId !== generationId) return;
+
             const { name, number } = entries[i];
             const mainCanvas = document.createElement('canvas');
             mainCanvas.width = 1063;
             mainCanvas.height = 236;
             const ctx = mainCanvas.getContext('2d');
 
-            ctx.fillStyle = '#ed1b24';
+            ctx.fillStyle = backgroundColor;
             ctx.fillRect(0, 0, mainCanvas.width, mainCanvas.height);
-            ctx.fillStyle = '#fce00a';
+            ctx.fillStyle = textColor;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
 
@@ -118,6 +151,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 throw new Error(`Gagal membuat gambar untuk nama "${name}".`);
             }
             const stickerBlob = await setPngResolution(canvasBlob, 300);
+            if (currentGenerationId !== generationId) return;
+
             zip.file(`Stiker_${String(i + 1).padStart(3, '0')}.png`, stickerBlob);
 
             const previewImg = document.createElement('img');
