@@ -640,7 +640,10 @@ body {
   }
 }
 .download-button:disabled, .primary-tool-button:disabled {
-  cursor: not-allowed; opacity: .55; box-shadow: none;
+  cursor: not-allowed; opacity: .6; box-shadow: none;
+  filter: grayscale(.6) brightness(.85);
+  background: #2a243a !important;
+  color: #7a708c !important;
 }
 .results-placeholder, .single-result-note {
   min-height: 88px; padding: 20px;

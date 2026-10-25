@@ -321,11 +321,14 @@ export default function Home() {
   const [assetResults, setAssetResults] = useState([]);
   const [assetSearchBusy, setAssetSearchBusy] = useState(false);
   const [assetSearchError, setAssetSearchError] = useState("");
+  const [assetFormat, setAssetFormat] = useState("svg");
+  const [assetSource, setAssetSource] = useState("commons");
   const [showDownloadNotice, setShowDownloadNotice] = useState(false);
   const [qrText, setQrText] = useState("");
   const [qrSize, setQrSize] = useState(300);
   const [qrColor, setQrColor] = useState("#000000");
   const [qrBgColor, setQrBgColor] = useState("#ffffff");
+  const [qrLevel, setQrLevel] = useState("M");
   const [qrImage, setQrImage] = useState(null);
   const [qrBusy, setQrBusy] = useState(false);
   const [resizeFile, setResizeFile] = useState(null);
@@ -658,11 +661,11 @@ export default function Home() {
     setAssetSearchError("");
     setAssetResults([]);
     try {
-      const response = await fetch(`/api/assets?q=${encodeURIComponent(query)}`);
+      const response = await fetch(`/api/assets?q=${encodeURIComponent(query)}&format=${assetFormat}&source=${assetSource}`);
       const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Pencarian SVG gagal.");
+      if (!response.ok) throw new Error(data.error || `Pencarian ${assetFormat.toUpperCase()} gagal.`);
       setAssetResults(data.assets);
-      if (data.assets.length === 0) setAssetSearchError("Tidak ada SVG yang cocok. Coba kata kunci lain.");
+      if (data.assets.length === 0) setAssetSearchError(`Tidak ada ${assetFormat.toUpperCase()} yang cocok. Coba kata kunci lain.`);
     } catch (requestError) {
       setAssetSearchError(requestError.message);
     } finally {
@@ -829,7 +832,7 @@ export default function Home() {
         height: Number(qrSize) || 300,
         colorDark: qrColor,
         colorLight: qrBgColor,
-        correctLevel: window.QRCode.CorrectLevel.M,
+        correctLevel: (window.QRCode.CorrectLevel && window.QRCode.CorrectLevel[qrLevel]) || window.QRCode.CorrectLevel.M,
       });
       await new Promise((r) => setTimeout(r, 60));
       const canvas = container.querySelector("canvas");
@@ -1049,16 +1052,25 @@ export default function Home() {
                   {[["left", "Kiri"], ["center", "Tengah"], ["right", "Kanan"]].map(([alignment, label]) => <button key={alignment}
                     type="button" className={textAlign === alignment ? "is-selected" : ""} aria-pressed={textAlign === alignment}
                     onClick={() => setTextAlign(alignment)}>{label}</button>)}</div></div>
-                <div className="option-row"><span className="option-label">Bingkai tepi</span><button type="button"
-                  className={stickerBorder ? "is-selected" : ""} aria-pressed={stickerBorder}
-                  onClick={() => setStickerBorder(!stickerBorder)}>
-                  {stickerBorder ? "Aktif" : "Nonaktif"}
-                </button>{stickerBorder && <div className="color-controls" style={{ marginTop: 8, gridTemplateColumns: "1fr" }}>
-                  <ColorPicker label="Warna bingkai" value={stickerBorderColor} onChange={setStickerBorderColor} />
-                  <div className="field-group" style={{ marginTop: 6 }}><label className="field-label">Tebal bingkai (px)</label>
-                    <input className="input-field" type="number" min="1" max="20" value={stickerBorderWidth}
-                      onChange={(e) => setStickerBorderWidth(e.target.value)} /></div>
-                </div>}</div>
+                <div className="option-row"><span className="option-label">Bingkai tepi</span>
+                  <div className="segmented-control" role="group" aria-label="Bingkai stiker">
+                    <button key="off" type="button"
+                      className={!stickerBorder ? "is-selected" : ""} aria-pressed={!stickerBorder}
+                      onClick={() => setStickerBorder(false)}>Off</button>
+                    <button key="on" type="button"
+                      className={stickerBorder ? "is-selected" : ""} aria-pressed={stickerBorder}
+                      onClick={() => setStickerBorder(true)}>On</button>
+                  </div>
+                </div>
+                {stickerBorder && <div className="field-group" style={{ marginTop: 8 }}>
+                  <div className="color-controls" style={{ gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 6 }}>
+                    <ColorPicker label="Warna bingkai" value={stickerBorderColor} onChange={setStickerBorderColor} />
+                    <div className="field-group" style={{ margin: 0 }}><label className="field-label">Tebal (px)</label>
+                      <input className="input-field" type="number" min="1" max="20" value={stickerBorderWidth}
+                        onChange={(e) => setStickerBorderWidth(e.target.value)} /></div>
+                  </div>
+                  <span className="badge purple">Bingkai aktif</span>
+                </div>}
               </div>
               <div className="size-note"><span className="size-note-icon"><Icon name="layers" size={16} /></span>
                 <span>Ukuran stiker <b>{stickerWidth || "0"} × {stickerHeight || "0"} cm</b>
@@ -1190,14 +1202,19 @@ export default function Home() {
           </div>
           <section className="asset-search-panel">
             <form className="asset-search-form" onSubmit={searchAssets}>
-              <label className="visually-hidden" htmlFor="asset-search">Cari ilustrasi SVG</label>
+              <label className="visually-hidden" htmlFor="asset-search">Cari ilustrasi {assetFormat.toUpperCase()}</label>
               <Icon name="search" size={20} />
-              <input id="asset-search" type="search" maxLength="100" placeholder="Contoh: coffee plant, flower, abstract shape..."
+              <input id="asset-search" type="search" maxLength="100" placeholder={`Contoh: coffee plant, flower, abstract shape... (${assetFormat.toUpperCase()})`}
                 value={assetQuery} onChange={(event) => setAssetQuery(event.target.value)} />
+              <div className="segmented-control" role="group" aria-label="Format aset">
+                {["svg", "png"].map((fmt) => <button key={fmt} type="button"
+                  className={assetFormat === fmt ? "is-selected" : ""} aria-pressed={assetFormat === fmt}
+                  onClick={() => setAssetFormat(fmt)}>{fmt.toUpperCase()}</button>)}
+              </div>
               <button className="primary-tool-button" type="submit" disabled={assetSearchBusy || assetQuery.trim().length < 2}>
-                {assetSearchBusy ? <><span className="spinner" /> Mencari</> : "Cari SVG"}<Icon name="arrow" size={16} /></button>
+                {assetSearchBusy ? <><span className="spinner" /> Mencari</> : `Cari ${assetFormat.toUpperCase()}`}<Icon name="arrow" size={16} /></button>
             </form>
-            <div className="asset-search-hint"><span>SUMBER</span> Wikimedia Commons · hasil memuat tautan sumber dan lisensi.</div>
+            <div className="asset-search-hint"><span>SUMBER</span> Wikimedia Commons · {assetFormat.toUpperCase()} lisensi bebas · hasil memuat tautan sumber dan lisensi.</div>
           </section>
           {assetSearchError && <div className="tool-error" role="status">{assetSearchError}</div>}
           {assetResults.length > 0 && <div className="asset-results-grid">
@@ -1208,8 +1225,8 @@ export default function Home() {
               <div className="asset-info"><strong title={asset.title}>{asset.title}</strong>
                 <span>Lisensi: {asset.license}</span>{asset.author && <span>Kontributor: {asset.author}</span>}
                 <div className="asset-actions">
-                  <a href={`/api/assets/download?title=${encodeURIComponent(asset.fileTitle)}&format=svg`} download>SVG <Icon name="download" size={14} /></a>
-                  <a href={`/api/assets/download?title=${encodeURIComponent(asset.fileTitle)}&format=png`} download>PNG <Icon name="download" size={14} /></a>
+                  <a href={`/api/assets/download?title=${encodeURIComponent(asset.fileTitle)}&format=${asset.format === "png" ? "png" : "svg"}`} download>
+                    {asset.format.toUpperCase()} <Icon name="download" size={14} /></a>
                 </div>
                 <a className="asset-source" href={asset.pageUrl} target="_blank" rel="noreferrer">Sumber &amp; lisensi <Icon name="external" size={13} /></a>
               </div>
@@ -1218,7 +1235,7 @@ export default function Home() {
           {!assetResults.length && !assetSearchError && <div className="asset-empty">
             <span className="empty-art"><span className="empty-art-back" /><span className="empty-art-front"><Icon name="search" size={23} /></span></span>
             <strong>{assetSearchBusy ? "Mencari aset berlisensi..." : "Kata kunci jadi inspirasi pertama."}</strong>
-            <span>{assetSearchBusy ? "Sedang mengambil hasil dari Wikimedia Commons." : "Cari untuk menemukan ilustrasi SVG yang bisa diunduh."}</span>
+            <span>{assetSearchBusy ? `Sedang mengambil hasil ${assetFormat.toUpperCase()} dari Wikimedia Commons.` : `Cari untuk menemukan ilustrasi ${assetFormat.toUpperCase()} yang bisa diunduh.`}</span>
           </div>}
           <aside className="zonalogo-card"><div><div className="section-kicker">PENCARIAN LOGO &amp; BRAND</div>
             <h2>Jelajahi katalog Zonalogo</h2><p>Buka sumber resminya untuk mencari logo, bendera, dan emblem. Hak merek dan aturan penggunaan mengikuti pemilik masing-masing.</p></div>
@@ -1251,6 +1268,17 @@ export default function Home() {
                 <div className="color-controls" style={{ gridTemplateColumns: "1fr 1fr" }}>
                   <ColorPicker label="Warna titik" value={qrColor} onChange={setQrColor} />
                   <ColorPicker label="Warna background" value={qrBgColor} onChange={setQrBgColor} />
+                </div>
+                <div className="field-group" style={{ marginTop: 10 }}>
+                  <label className="field-label">Model koreksi (error correction)</label>
+                  <div className="segmented-control" role="group" aria-label="Tingkat koreksi QR">
+                    {["L", "M", "Q", "H"].map((lvl) => <button key={lvl} type="button"
+                      className={qrLevel === lvl ? "is-selected" : ""} aria-pressed={qrLevel === lvl}
+                      onClick={() => setQrLevel(lvl)}>{lvl}</button>)}
+                  </div>
+                  <p className="tool-description" style={{ marginTop: 6, fontSize: "9px" }}>
+                    L = ringan (7%), M = sedang (15%), Q = kuat (25%), H = sangat kuat (30%). Semakin tinggi, semakin tahan rusak tapi ukuran QR semakin padat.
+                  </p>
                 </div>
                 <button type="button" className="primary-tool-button full-button" onClick={generateQr} disabled={qrBusy || !qrText.trim()}>
                   {qrBusy ? <><span className="spinner" /> Membuat...</> : <><Icon name="qr" size={17} /> Buat QR Code</>}</button>

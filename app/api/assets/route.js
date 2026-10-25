@@ -16,6 +16,9 @@ function plainText(value = "") {
 
 export async function GET(request) {
   const query = new URL(request.url).searchParams.get("q")?.trim() || "";
+  const format = new URL(request.url).searchParams.get("format") || "svg";
+  const source = new URL(request.url).searchParams.get("source") || "commons";
+
   if (query.length < 2 || query.length > 100) {
     return NextResponse.json(
       { error: "Kata kunci pencarian harus berisi 2–100 karakter." },
@@ -23,12 +26,20 @@ export async function GET(request) {
     );
   }
 
+  if (source !== "commons") {
+    return NextResponse.json(
+      { error: "Sumber aset saat ini hanya Wikimedia Commons." },
+      { status: 400 },
+    );
+  }
+
+  const mimeFilter = format === "png" ? "image/png" : "image/svg+xml";
   const parameters = new URLSearchParams({
     action: "query",
     generator: "search",
-    gsrsearch: `filemime:image/svg+xml ${query}`,
+    gsrsearch: `filemime:${mimeFilter} ${query}`,
     gsrnamespace: "6",
-    gsrlimit: "12",
+    gsrlimit: "16",
     prop: "imageinfo",
     iiprop: "url|mime|extmetadata",
     iiurlwidth: "640",
@@ -58,7 +69,7 @@ export async function GET(request) {
     const assets = (data.query?.pages || [])
       .map((page) => {
         const image = page.imageinfo?.[0];
-        if (!image?.thumburl || !image?.descriptionurl || image.mime !== "image/svg+xml") return null;
+        if (!image?.thumburl || !image?.descriptionurl || image.mime !== mimeFilter) return null;
         const metadata = image.extmetadata || {};
         return {
           id: String(page.pageid),
@@ -71,12 +82,14 @@ export async function GET(request) {
             metadata.LicenseShortName?.value || metadata.UsageTerms?.value || "Periksa halaman lisensi",
           ),
           licenseUrl: metadata.LicenseUrl?.value || image.descriptionurl,
+          format,
+          source,
         };
       })
       .filter(Boolean);
 
     return NextResponse.json(
-      { assets },
+      { assets, format, source },
       { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" } },
     );
   } catch {

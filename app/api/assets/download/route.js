@@ -41,8 +41,8 @@ export async function GET(request) {
     const metadata = await metadataResponse.json();
     const page = metadata.query?.pages?.[0];
     const image = page?.imageinfo?.[0];
-    if (!image || image.mime !== "image/svg+xml" || page.missing) {
-      return NextResponse.json({ error: "Aset SVG tersebut tidak tersedia di Commons." }, { status: 404 });
+    if (!image || page.missing) {
+      return NextResponse.json({ error: "Aset tersebut tidak tersedia di Commons." }, { status: 404 });
     }
 
     const imageUrl = format === "svg" ? image.url : image.thumburl;
