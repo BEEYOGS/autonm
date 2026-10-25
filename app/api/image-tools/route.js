@@ -27,7 +27,18 @@ function getWorker() {
     : { command: process.env.STIKERIN_PYTHON_PATH || "python3", prefix: [script] };
 }
 
-function runWorker(args, timeoutMs = 120_000) {
+function getWorkerEnvironment() {
+  const modelDirectory = process.env.STIKERIN_MODEL_DIR
+    || path.join(os.homedir(), "AppData", "Local", "Stikerin Studio", "models");
+  return {
+    ...process.env,
+    STIKERIN_MODEL_DIR: modelDirectory,
+    U2NET_HOME: process.env.U2NET_HOME || path.join(modelDirectory, "u2net"),
+    PYTHONDONTWRITEBYTECODE: "1",
+  };
+}
+
+function runWorker(args, timeoutMs = 600_000) {
   const worker = getWorker();
   if (!worker) return Promise.reject(new Error("Worker Python hanya tersedia di aplikasi desktop lokal."));
 
@@ -35,7 +46,7 @@ function runWorker(args, timeoutMs = 120_000) {
     const child = spawn(worker.command, [...worker.prefix, ...args], {
       windowsHide: true,
       stdio: ["ignore", "ignore", "pipe"],
-      env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" },
+      env: getWorkerEnvironment(),
     });
     let stderr = "";
     let settled = false;
@@ -80,9 +91,15 @@ export async function GET(request) {
     encoding: "utf8",
     timeout: 10_000,
     windowsHide: true,
-    env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" },
+    env: getWorkerEnvironment(),
   });
-  return Response.json({ available: !check.error && check.status === 0 });
+  if (check.error || check.status !== 0) return Response.json({ available: false });
+  try {
+    return Response.json(JSON.parse(check.stdout));
+  } catch (error) {
+    console.error("Status worker gambar tidak valid:", error);
+    return jsonError("Worker gambar mengembalikan status yang tidak valid.", 500);
+  }
 }
 
 export async function POST(request) {
@@ -103,7 +120,7 @@ export async function POST(request) {
     if (!isUpload(image) || !IMAGE_TYPES.has(image.type) || image.size === 0 || image.size > MAX_FILE_SIZE) {
       return jsonError("Pilih gambar PNG, JPG, atau WebP maksimal 20 MB.", 400);
     }
-    if (!["upscale", "remove-background"].includes(operation)) {
+    if (!["upscale", "upscale-ai", "remove-background", "remove-background-ai"].includes(operation)) {
       return jsonError("Operasi gambar tidak didukung.", 400);
     }
 
@@ -114,11 +131,15 @@ export async function POST(request) {
     await writeFile(inputPath, Buffer.from(await image.arrayBuffer()));
     args.push("--input", inputPath, "--output", outputPath);
 
-    if (operation === "upscale") {
+    if (operation === "upscale" || operation === "upscale-ai") {
       const scale = Number(form.get("scale"));
-      if (![2, 3, 4].includes(scale)) return jsonError("Skala yang didukung hanya 2x, 3x, atau 4x.", 400);
+      if (operation === "upscale-ai" ? ![2, 4].includes(scale) : ![2, 3, 4].includes(scale)) {
+        return jsonError(operation === "upscale-ai"
+          ? "Skala AI yang didukung hanya 2x atau 4x."
+          : "Skala yang didukung hanya 2x, 3x, atau 4x.", 400);
+      }
       args.push("--scale", String(scale));
-    } else {
+    } else if (operation === "remove-background") {
       const mask = form.get("mask");
       if (!isUpload(mask) || mask.type !== "image/png" || mask.size === 0 || mask.size > MAX_MASK_SIZE) {
         return jsonError("Mask PNG kuas tidak valid.", 400);

@@ -6,6 +6,8 @@ import * as XLSX from "@e965/xlsx";
 
 const PRINT_DPI = 300;
 const MAX_IMAGE_SIZE = 20 * 1024 * 1024;
+const DESKTOP_DOWNLOAD_URL = process.env.NEXT_PUBLIC_DESKTOP_DOWNLOAD_URL
+  || "https://github.com/BEEYOGS/autonm/releases";
 
 function Icon({ name, size = 20 }) {
   const paths = {
@@ -172,6 +174,15 @@ function ColorPicker({ label, value, onChange }) {
             onKeyDown={handleFieldKeyDown}
           >
             <span aria-hidden="true" />
+            <span
+              className="color-picker-indicator"
+              aria-hidden="true"
+              style={{
+                left: `${color.saturation * 100}%`,
+                top: `${(1 - color.value) * 100}%`,
+                backgroundColor: value,
+              }}
+            />
           </div>
           <label className="hue-control">
             <span>Rona</span>
@@ -181,10 +192,12 @@ function ColorPicker({ label, value, onChange }) {
               max="359"
               value={Math.round(hue)}
               aria-label={`Rona ${label.toLowerCase()}`}
+              style={{ "--picker-current-color": value }}
               onChange={(event) => updateColor(Number(event.target.value))}
             />
           </label>
           <div className="color-picker-footer">
+            <span className="color-preview-swatch" style={{ backgroundColor: value }} aria-hidden="true" />
             <label className="hex-control">
               <span>HEX</span>
               <input
@@ -291,7 +304,11 @@ export default function Home() {
   const [upscaleFactor, setUpscaleFactor] = useState("2");
   const [imageBusy, setImageBusy] = useState(false);
   const [imageError, setImageError] = useState("");
-  const [pythonImageTools, setPythonImageTools] = useState(false);
+  const [imageModels, setImageModels] = useState({
+    available: false,
+    backgroundAiReady: false,
+    upscalerAiReady: false,
+  });
   const [brushSize, setBrushSize] = useState(32);
   const [brushMode, setBrushMode] = useState("erase");
   const [backgroundDirty, setBackgroundDirty] = useState(false);
@@ -300,13 +317,46 @@ export default function Home() {
   const [assetResults, setAssetResults] = useState([]);
   const [assetSearchBusy, setAssetSearchBusy] = useState(false);
   const [assetSearchError, setAssetSearchError] = useState("");
+  const [showDownloadNotice, setShowDownloadNotice] = useState(false);
+
+  useEffect(() => {
+    if (window.navigator.userAgent.includes("Electron")) return undefined;
+    try {
+      if (window.localStorage.getItem("stikerin-download-prompt-dismissed-v1") === "true") {
+        return undefined;
+      }
+    } catch (storageError) {
+      console.warn("Preferensi pemberitahuan unduhan tidak dapat dibaca:", storageError);
+    }
+    const timeout = window.setTimeout(() => setShowDownloadNotice(true), 2400);
+    return () => window.clearTimeout(timeout);
+  }, []);
+
+  function dismissDownloadNotice() {
+    setShowDownloadNotice(false);
+    try {
+      window.localStorage.setItem("stikerin-download-prompt-dismissed-v1", "true");
+    } catch (storageError) {
+      console.warn("Preferensi pemberitahuan unduhan tidak dapat disimpan:", storageError);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
     fetch("/api/image-tools", { cache: "no-store" })
-      .then((response) => response.ok ? response.json() : { available: false })
-      .then((result) => { if (!cancelled) setPythonImageTools(result.available === true); })
-      .catch(() => { if (!cancelled) setPythonImageTools(false); });
+      .then((response) => response.ok ? response.json() : null)
+      .then((result) => {
+        if (!cancelled && result) {
+          setImageModels({
+            available: result.available === true,
+            backgroundAiReady: result.backgroundAiReady === true,
+            upscalerAiReady: result.upscalerAiReady === true,
+          });
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setImageModels({ available: false, backgroundAiReady: false, upscalerAiReady: false });
+      });
     return () => { cancelled = true; };
   }, []);
 
@@ -427,9 +477,9 @@ export default function Home() {
         throw new Error("Hasil melebihi batas aman 40 megapiksel. Coba skala 2× atau gambar yang lebih kecil.");
       }
       let blob;
-      if (pythonImageTools) {
+      if (imageModels.available) {
         const form = new FormData();
-        form.append("operation", "upscale");
+        form.append("operation", "upscale-ai");
         form.append("scale", String(scale));
         form.append("image", imageFile, imageFile.name);
         blob = await requestPythonImage(form);
@@ -451,6 +501,9 @@ export default function Home() {
         height,
         name: `${imageFile.name.replace(/\.[^.]+$/, "")}_${scale}x.png`,
       });
+      if (imageModels.available) {
+        setImageModels((current) => ({ ...current, upscalerAiReady: true }));
+      }
     } catch (processingError) {
       setImageError(processingError.message || "Gagal memproses gambar.");
     } finally {
@@ -530,6 +583,25 @@ export default function Home() {
     setBackgroundDownload("");
   }
 
+  async function removeBackgroundAI() {
+    if (!imageFile || !imageModels.available || imageBusy) return;
+    setImageBusy(true);
+    setImageError("");
+    setBackgroundDownload("");
+    try {
+      const form = new FormData();
+      form.append("operation", "remove-background-ai");
+      form.append("image", imageFile, imageFile.name);
+      const blob = await requestPythonImage(form);
+      setBackgroundDownload(URL.createObjectURL(blob));
+      setImageModels((current) => ({ ...current, backgroundAiReady: true }));
+    } catch (processingError) {
+      setImageError(processingError.message || "Gagal menghapus latar dengan AI lokal.");
+    } finally {
+      setImageBusy(false);
+    }
+  }
+
   async function exportBackground() {
     const canvas = backgroundCanvasRef.current;
     const mask = maskCanvasRef.current;
@@ -538,7 +610,7 @@ export default function Home() {
     setImageError("");
     try {
       let blob;
-      if (pythonImageTools) {
+      if (imageModels.available) {
         const maskBlob = await new Promise((resolve) => mask.toBlob(resolve, "image/png"));
         if (!maskBlob) throw new Error("Gagal menyiapkan mask kuas.");
         const form = new FormData();
@@ -723,8 +795,31 @@ export default function Home() {
           <span className="brand-mark"><Icon name="spark" size={21} /></span>
           <span>stikerin<span className="brand-period">.</span></span>
         </a>
-        <div className="topbar-note"><span className="online-dot" /> Studio desain · file tetap di perangkat</div>
+        <div className="topbar-actions">
+          <div className="topbar-note"><span className="online-dot" /> Studio desain · file tetap di perangkat</div>
+          <a className="desktop-download-link" href={DESKTOP_DOWNLOAD_URL} target="_blank" rel="noreferrer">
+            <Icon name="download" size={15} /> Aplikasi Windows
+          </a>
+        </div>
       </header>
+
+      {showDownloadNotice && (
+        <>
+          <div className="download-backdrop" onClick={dismissDownloadNotice} />
+          <aside className="download-notice" role="status" aria-live="polite">
+          <span className="download-notice-icon"><Icon name="download" size={19} /></span>
+          <div className="download-notice-copy">
+            <strong>Desain lebih nyaman di Windows</strong>
+            <span>Pasang Stikerin Studio untuk memakai AI gambar lokal.</span>
+            <a href={DESKTOP_DOWNLOAD_URL} target="_blank" rel="noreferrer">
+              Lihat aplikasi Windows <Icon name="arrow" size={14} />
+            </a>
+          </div>
+          <button className="download-notice-close" type="button" aria-label="Tutup pemberitahuan unduhan"
+            onClick={dismissDownloadNotice}><Icon name="close" size={16} /></button>
+        </aside>
+        </>
+      )}
 
       <nav className="tool-switcher" aria-label="Pilih tool">
         {TOOLS.map(([tool, label, icon]) => (
@@ -841,7 +936,7 @@ export default function Home() {
           <div className="tool-page-heading">
             <div className="section-kicker">{activeTool === "upscale" ? "PEMBESAR GAMBAR" : "PENGHAPUS LATAR"}</div>
             <h1>{activeTool === "upscale" ? <>Beri asetmu ruang<br /><span>untuk tampil besar.</span></> : <>Rapikan latar<br /><span>dengan kontrolmu.</span></>}</h1>
-            <p>File diproses lokal dan tidak dikirim ke internet.</p>
+            <p>AI berjalan di perangkat Anda. Model hanya diunduh saat pertama kali dipakai.</p>
           </div>
           <section className="editor-card">
             <div className="editor-sidebar">
@@ -856,22 +951,35 @@ export default function Home() {
               {activeTool === "upscale" && <>
                 <label className="editor-label" htmlFor="upscale-factor">Skala pembesaran</label>
                 <select id="upscale-factor" className="editor-select" value={upscaleFactor} onChange={(event) => setUpscaleFactor(event.target.value)}>
-                  <option value="2">2× · seimbang</option><option value="3">3× · lebih detail</option><option value="4">4× · maksimal</option>
+                  <option value="2">2× · seimbang</option><option value="4">4× · maksimal</option>
                 </select>
                 <p className="tool-description">
-                  {pythonImageTools ? "Python Pillow · Lanczos." : "Mode browser · interpolasi berkualitas tinggi."}
-                  {" "}Memperbesar piksel, bukan memulihkan detail yang hilang.
+                  {imageModels.available
+                    ? imageModels.upscalerAiReady
+                      ? "Real-ESRGAN x4v3 siap · AI lokal."
+                      : "AI lokal Real-ESRGAN · unduhan pertama sekitar 5 MB."
+                    : "AI tersedia di aplikasi desktop. Mode browser memperbesar tanpa AI."}
+                  {" "}Pemrosesan memakai CPU dan berusaha memulihkan detail gambar.
                 </p>
                 <button type="button" className="primary-tool-button full-button" onClick={upscaleImage} disabled={!imageFile || imageBusy}>
-                  {imageBusy ? <><span className="spinner" /> Memproses...</> : <><Icon name="image" size={17} /> Perbesar gambar</>}</button>
+                  {imageBusy ? <><span className="spinner" /> {imageModels.upscalerAiReady ? "Meningkatkan kualitas..." : "Menyiapkan AI lokal..."}</> :
+                    <><Icon name="image" size={17} /> {imageModels.available ? "AI perbesar & jernihkan" : "Perbesar gambar"}</>}</button>
               </>}
               {activeTool === "background" && <>
                 <div className="editor-label">Kuas manual · hanya gambar milik Anda</div>
                 <p className="tool-description">
                   Sapukan kuas pada area latar untuk menjadikannya transparan.{" "}
-                  {pythonImageTools ? "Mask diproses oleh Python Pillow." : "Pemrosesan memakai browser."}
+                  {imageModels.available
+                    ? imageModels.backgroundAiReady
+                      ? "AI lokal BiRefNet siap."
+                      : "Unduhan model AI pertama sekitar 214 MB."
+                    : "Mode AI lokal tersedia di aplikasi desktop."}
                   {" "}Tidak ada penghapus watermark.
                 </p>
+                <button type="button" className="primary-tool-button full-button" onClick={removeBackgroundAI}
+                  disabled={!imageFile || !imageModels.available || imageBusy}>
+                  {imageBusy ? <><span className="spinner" /> {imageModels.backgroundAiReady ? "Menghapus latar..." : "Mengunduh model AI..."}</> :
+                    <><Icon name="spark" size={17} /> Hapus latar otomatis · AI lokal</>}</button>
                 <div className="brush-modes" role="group" aria-label="Mode kuas">
                   <button type="button" className={brushMode === "erase" ? "is-selected" : ""} aria-pressed={brushMode === "erase"} onClick={() => setBrushMode("erase")}>Hapus latar</button>
                   <button type="button" className={brushMode === "restore" ? "is-selected" : ""} aria-pressed={brushMode === "restore"} onClick={() => setBrushMode("restore")}>Pulihkan</button>

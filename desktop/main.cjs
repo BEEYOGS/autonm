@@ -51,6 +51,7 @@ async function startLocalApp() {
       NODE_ENV: "production",
       NEXT_TELEMETRY_DISABLED: "1",
       STIKERIN_IMAGE_WORKER: path.join(process.resourcesPath, "image-worker.exe"),
+      STIKERIN_MODEL_DIR: path.join(app.getPath("userData"), "models"),
     },
     stdio: ["ignore", "pipe", "pipe"],
     windowsHide: true,

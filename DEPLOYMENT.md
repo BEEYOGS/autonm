@@ -1,9 +1,9 @@
 # Stikerin Studio
 
 Stikerin Studio is a Windows desktop design utility and a Next.js web app. It
-keeps sticker generation, image upscaling, manual background erasing for images
-you own, and licensed SVG asset search. There is no AI chat or image-generation
-service.
+keeps sticker generation, local AI background removal and upscaling, manual
+background editing, and licensed SVG asset search. There is no AI chat or
+image-generation service.
 
 ## Windows desktop app
 
@@ -22,18 +22,24 @@ to `127.0.0.1`; it is stopped when the desktop app exits.
    line tools (`candle.exe` and `light.exe`) to `PATH`, then run
    `npm run desktop:msi`. `npm run desktop:dist` builds both installers.
 
-The desktop build currently targets 64-bit Windows and bundles a Python/Pillow
-worker so image processing stays local. Lanczos enlargement adds pixels but
-does not reconstruct AI detail. Unsigned installers may show a Windows
-SmartScreen warning until the publisher signs the release.
+The desktop build currently targets 64-bit Windows and bundles a Python CPU
+worker using BiRefNet General Lite for background removal and Real-ESRGAN
+General x4v3 for image enhancement. Models download on first use and are kept
+in the Stikerin Studio user-data folder: approximately 214 MB for background
+removal and 5 MB for upscaling. The first download requires an internet
+connection; image files themselves are processed locally and are not uploaded.
+The AI upscaler outputs 2x or 4x PNG. Larger requests are limited to 40
+megapixels. Unsigned installers may show a Windows SmartScreen warning until
+the publisher signs the release.
 
 ## Web app
 
 The app can still be deployed as a standard Next.js project, for example on
-Vercel. Sticker generation, upscaling, and manual background erasing run in the
-browser there; the Python worker is enabled only by the local desktop package.
-Asset search and downloads need an internet connection and use the Wikimedia
-Commons API. The desktop app does not bundle or mirror third-party assets.
+Vercel. Sticker generation, basic browser upscaling, and manual background
+erasing run in the browser there; the local Python AI worker is only available
+in the desktop package. Asset search and downloads need an internet connection
+and use the Wikimedia Commons API. The desktop app does not bundle or mirror
+third-party assets.
 
 ## Asset usage
 
@@ -43,6 +49,6 @@ asset in client or commercial work. Zonalogo opens as an external catalog;
 logos, flags, and trademarks remain subject to their owners' rules and are not
 downloaded or redistributed by this app.
 
-The background tool is a manual transparency brush. It operates on the
-selected local image and is intended for images the user owns or is authorized
-to edit. It does not remove watermarks.
+The background tool provides local AI removal and a manual transparency brush.
+It operates on the selected local image and is intended for images the user
+owns or is authorized to edit. It does not remove watermarks.

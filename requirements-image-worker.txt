@@ -1,2 +1,2 @@
-Pillow>=11.3,<13
+rembg[cpu]==2.0.85
 PyInstaller>=6.15,<7
