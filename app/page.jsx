@@ -25,6 +25,8 @@ function Icon({ name, size = 20 }) {
     layers: <><path d="m12 3 9 5-9 5-9-5 9-5Z" /><path d="m3 12 9 5 9-5M3 16l9 5 9-5" /></>,
     undo: <><path d="M3 7v5h5" /><path d="M5 12a8 8 0 1 0 2-5.3L3 12" /></>,
     external: <><path d="M14 3h7v7m0-7-9 9" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></>,
+    qr: <><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><path d="M12 12m-3 0a3 3 0 1 0 6 0a3 3 0 1 0 -6 0" /></>,
+    resize: <><path d="M3 3v18h18" /><path d="M3 3h18v18" /></>,
   };
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{paths[name] || paths.spark}</svg>;
 }
@@ -271,6 +273,8 @@ const TOOLS = [
   ["upscale", "Perbesar", "image"],
   ["background", "Hapus latar", "brush"],
   ["assets", "Cari aset", "search"],
+  ["qr", "QR Code", "qr"],
+  ["resize", "Ubah Ukuran", "resize"],
 ];
 
 export default function Home() {
@@ -318,6 +322,22 @@ export default function Home() {
   const [assetSearchBusy, setAssetSearchBusy] = useState(false);
   const [assetSearchError, setAssetSearchError] = useState("");
   const [showDownloadNotice, setShowDownloadNotice] = useState(false);
+  const [qrText, setQrText] = useState("");
+  const [qrSize, setQrSize] = useState(300);
+  const [qrColor, setQrColor] = useState("#000000");
+  const [qrBgColor, setQrBgColor] = useState("#ffffff");
+  const [qrImage, setQrImage] = useState(null);
+  const [qrBusy, setQrBusy] = useState(false);
+  const [resizeFile, setResizeFile] = useState(null);
+  const [resizePreview, setResizePreview] = useState("");
+  const [resizeWidth, setResizeWidth] = useState("");
+  const [resizeHeight, setResizeHeight] = useState("");
+  const [resizeResult, setResizeResult] = useState(null);
+  const [resizeBusy, setResizeBusy] = useState(false);
+  const [toasts, setToasts] = useState([]);
+  const [stickerBorder, setStickerBorder] = useState(false);
+  const [stickerBorderColor, setStickerBorderColor] = useState("#000000");
+  const [stickerBorderWidth, setStickerBorderWidth] = useState(4);
 
   useEffect(() => {
     if (window.navigator.userAgent.includes("Electron")) return undefined;
@@ -697,6 +717,12 @@ export default function Home() {
           context.clip();
           context.fillStyle = backgroundColor;
           context.fillRect(0, 0, canvas.width, canvas.height);
+          if (stickerBorder) {
+            context.lineWidth = stickerBorderWidth;
+            context.strokeStyle = stickerBorderColor;
+            context.strokeRect(stickerBorderWidth / 2, stickerBorderWidth / 2,
+              canvas.width - stickerBorderWidth, canvas.height - stickerBorderWidth);
+          }
           context.fillStyle = textColor;
           context.textAlign = textAlign;
           context.textBaseline = "middle";
@@ -733,7 +759,7 @@ export default function Home() {
     }
     createStickers();
     return () => { cancelled = true; };
-  }, [entries, backgroundColor, textColor, stickerWidth, stickerHeight, stickerShape, textAlign]);
+  }, [entries, backgroundColor, textColor, stickerWidth, stickerHeight, stickerShape, textAlign, stickerBorder, stickerBorderColor, stickerBorderWidth]);
 
   async function handleFile(file) {
     if (!file) return;
@@ -775,6 +801,102 @@ export default function Home() {
     }
   }
 
+  function toast(message, type = "info", duration = 4000) {
+    const id = Date.now() + Math.random();
+    setToasts((prev) => [...prev, { id, message, type }]);
+    if (duration > 0) {
+      setTimeout(() => setToasts((prev) => prev.filter((t) => t.id !== id)), duration);
+    }
+  }
+
+  // ---------- QR Code ----------
+  async function generateQr() {
+    if (!qrText.trim() || !window.QRCode) return;
+    setQrBusy(true);
+    try {
+      const canvas = document.createElement("canvas");
+      await new Promise((resolve) => {
+        window.QRCode.toCanvas(canvas, qrText.trim(), {
+          width: Number(qrSize),
+          margin: 2,
+          color: { dark: qrColor, light: qrBgColor },
+        }, resolve);
+      });
+      setQrImage(canvas.toDataURL("image/png"));
+      toast("QR Code berhasil dibuat", "success");
+    } catch (err) {
+      toast("Gagal membuat QR Code: " + (err.message || err), "error");
+    } finally {
+      setQrBusy(false);
+    }
+  }
+
+  function downloadQr() {
+    if (!qrImage) return;
+    const a = document.createElement("a");
+    a.href = qrImage;
+    a.download = "qrcode.png";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    toast("QR Code diunduh", "success");
+  }
+
+  // ---------- Image Resize ----------
+  function handleResizeFile(file) {
+    if (!file) return;
+    if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) {
+      toast("Format tidak didukung: PNG, JPG, WebP", "error");
+      return;
+    }
+    const url = URL.createObjectURL(file);
+    setResizeFile(file);
+    setResizePreview(url);
+    setResizeResult(null);
+    setResizeWidth("");
+    setResizeHeight("");
+  }
+
+  async function doResize() {
+    if (!resizeFile || (!resizeWidth && !resizeHeight)) return;
+    setResizeBusy(true);
+    try {
+      const img = new Image();
+      img.src = resizePreview;
+      await new Promise((resolve, reject) => { img.onload = resolve; img.onerror = reject; });
+      const origW = img.naturalWidth;
+      const origH = img.naturalHeight;
+      const w = resizeWidth ? Number(resizeWidth) : Math.round((Number(resizeHeight) / origH) * origW);
+      const h = resizeHeight ? Number(resizeHeight) : Math.round((Number(resizeWidth) / origW) * origH);
+      if (w > 4096 || h > 4096) throw new Error("Ukuran maksimal 4096×4096 px.");
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext("2d");
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(img, 0, 0, w, h);
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+      setResizeResult(URL.createObjectURL(blob));
+      toast("Gambar diubah ukurannya", "success");
+    } catch (err) {
+      toast("Gagal mengubah ukuran: " + (err.message || err), "error");
+    } finally {
+      setResizeBusy(false);
+    }
+  }
+
+  function downloadResize() {
+    if (!resizeResult) return;
+    const a = document.createElement("a");
+    a.href = resizeResult;
+    a.download = "resize.png";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    toast("Hasil resize diunduh", "success");
+  }
+
   function resetProject() {
     setEntries([]);
     setStickers([]);
@@ -790,6 +912,19 @@ export default function Home() {
 
   return (
     <main className="app-shell">
+      <div className="toast-container">
+        {toasts.map((t) => (
+          <div key={t.id} className={`toast ${t.type}`} role="status" aria-live="polite">
+            <span className="toast-icon">
+              {t.type === "success" ? "✔" : t.type === "error" ? "✖" : "ℹ"}
+            </span>
+            <span>{t.message}</span>
+            <button className="toast-close" onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}>
+              <Icon name="close" size={14} />
+            </button>
+          </div>
+        ))}
+      </div>
       <header className="topbar">
         <a className="brand" href="#" aria-label="Stikerin beranda">
           <span className="brand-mark"><Icon name="spark" size={21} /></span>
@@ -893,6 +1028,16 @@ export default function Home() {
                   {[["left", "Kiri"], ["center", "Tengah"], ["right", "Kanan"]].map(([alignment, label]) => <button key={alignment}
                     type="button" className={textAlign === alignment ? "is-selected" : ""} aria-pressed={textAlign === alignment}
                     onClick={() => setTextAlign(alignment)}>{label}</button>)}</div></div>
+                <div className="option-row"><span className="option-label">Bingkai tepi</span><button type="button"
+                  className={stickerBorder ? "is-selected" : ""} aria-pressed={stickerBorder}
+                  onClick={() => setStickerBorder(!stickerBorder)}>
+                  {stickerBorder ? "Aktif" : "Nonaktif"}
+                </button>{stickerBorder && <div className="color-controls" style={{ marginTop: 8, gridTemplateColumns: "1fr" }}>
+                  <ColorPicker label="Warna bingkai" value={stickerBorderColor} onChange={setStickerBorderColor} />
+                  <div className="field-group" style={{ marginTop: 6 }}><label className="field-label">Tebal bingkai (px)</label>
+                    <input className="input-field" type="number" min="1" max="20" value={stickerBorderWidth}
+                      onChange={(e) => setStickerBorderWidth(e.target.value)} /></div>
+                </div>}</div>
               </div>
               <div className="size-note"><span className="size-note-icon"><Icon name="layers" size={16} /></span>
                 <span>Ukuran stiker <b>{stickerWidth || "0"} × {stickerHeight || "0"} cm</b>
@@ -1058,6 +1203,105 @@ export default function Home() {
             <h2>Jelajahi katalog Zonalogo</h2><p>Buka sumber resminya untuk mencari logo, bendera, dan emblem. Hak merek dan aturan penggunaan mengikuti pemilik masing-masing.</p></div>
             <a className="secondary-button" href="https://zonalogo.com/browse" target="_blank" rel="noreferrer">Buka Zonalogo <Icon name="external" size={16} /></a>
           </aside>
+        </section>
+      )}
+
+      {activeTool === "qr" && (
+        <section className="editor-page">
+          <div className="tool-page-heading">
+            <div className="section-kicker">QR CODE GENERATOR</div>
+            <h1>Buat QR Code<br /><span>dari teks atau URL.</span></h1>
+            <p className="tool-intro">Hasilkan QR Code instan untuk kontak, situs, Wi-Fi, atau teks apa saja. Hasil bisa langsung diunduh sebagai PNG.</p>
+          </div>
+          <section className="editor-card">
+            <div className="editor-sidebar">
+              <div className="section-card">
+                <div className="section-kicker">KONFIGURASI</div>
+                <div className="field-group">
+                  <label className="field-label">Teks atau URL</label>
+                  <input className="input-field" type="text" placeholder="Contoh: https://stikerin.com"
+                    value={qrText} onChange={(e) => setQrText(e.target.value)} />
+                </div>
+                <div className="field-group">
+                  <label className="field-label">Ukuran (px)</label>
+                  <input className="input-field" type="number" min="100" max="1024" value={qrSize}
+                    onChange={(e) => setQrSize(e.target.value)} />
+                </div>
+                <div className="color-controls" style={{ gridTemplateColumns: "1fr 1fr" }}>
+                  <ColorPicker label="Warna titik" value={qrColor} onChange={setQrColor} />
+                  <ColorPicker label="Warna background" value={qrBgColor} onChange={setQrBgColor} />
+                </div>
+                <button type="button" className="primary-tool-button full-button" onClick={generateQr} disabled={qrBusy || !qrText.trim()}>
+                  {qrBusy ? <><span className="spinner" /> Membuat...</> : <><Icon name="qr" size={17} /> Buat QR Code</>}</button>
+              </div>
+            </div>
+            <div className="editor-stage">
+              {qrImage ? <>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+                  <img src={qrImage} alt="QR Code" style={{ maxWidth: 260, maxHeight: 260, imageRendering: "pixelated" }} />
+                  <button type="button" className="primary-tool-button" onClick={downloadQr}>
+                    <Icon name="download" size={16} /> Unduh QR Code PNG
+                  </button>
+                </div>
+              </> : <div className="empty-editor"><span className="empty-art"><span className="empty-art-back" /><span className="empty-art-front"><Icon name="qr" size={25} /></span></span>
+                <strong>QR Code akan muncul di sini</strong><span>Isi teks atau URL, lalu klik Buat QR Code</span></div>}
+            </div>
+          </section>
+        </section>
+      )}
+
+      {activeTool === "resize" && (
+        <section className="editor-page">
+          <div className="tool-page-heading">
+            <div className="section-kicker">UBAH UKURAN GAMBAR</div>
+            <h1>Perbesar atau<br /><span>perkecil gambar.</span></h1>
+            <p className="tool-intro">Ubah ukuran gambar dengan mempertahankan proporsi atau menyesukai ukuran baru. Hasil diekspor sebagai PNG.</p>
+          </div>
+          <section className="editor-card">
+            <div className="editor-sidebar">
+              <div className="section-card">
+                <div className="section-kicker">SUMBER</div>
+                <button className="dropzone image-dropzone" type="button" onClick={() => imageInputRef.current?.click()}>
+                  <span className="upload-icon"><Icon name="upload" size={22} /></span>
+                  <span className="drop-copy"><strong>{resizeFile?.name || "Pilih gambar"}</strong>
+                    <span>PNG, JPG, WebP · maksimal 20 MB</span></span><Icon name="arrow" size={16} /></button>
+                <input ref={imageInputRef} className="visually-hidden" type="file" accept="image/png,image/jpeg,image/webp"
+                  onChange={(event) => { const file = event.target.files[0]; event.target.value = ""; handleResizeFile(file); }} />
+                {resizePreview && <div className="tool-error" role="status" style={{ borderColor: "#4a7c17", color: "#c4f27a", background: "#17141f" }}>{resizeFile?.name} siap diubah ukurannya</div>}
+              </div>
+              <div className="section-card">
+                <div className="section-kicker">DIMENSI</div>
+                <div className="field-group">
+                  <label className="field-label">Lebar (px)</label>
+                  <input className="input-field" type="number" min="1" max="4096" value={resizeWidth}
+                    onChange={(e) => setResizeWidth(e.target.value)} />
+                </div>
+                <div className="field-group">
+                  <label className="field-label">Tinggi (px)</label>
+                  <input className="input-field" type="number" min="1" max="4096" value={resizeHeight}
+                    onChange={(e) => setResizeHeight(e.target.value)} />
+                </div>
+                <p className="tool-description">Kosongkan salah satu sisi untuk mempertahankan rasio aspek.</p>
+                <button type="button" className="primary-tool-button full-button" onClick={doResize} disabled={resizeBusy || !resizeFile || (!resizeWidth && !resizeHeight)}>
+                  {resizeBusy ? <><span className="spinner" /> Mengubah ukuran...</> : <><Icon name="resize" size={17} /> Ubah ukuran gambar</>}</button>
+              </div>
+            </div>
+            <div className="editor-stage">
+              {resizePreview ? <>
+                <img className="editor-preview" src={resizePreview} alt="Pratinjau gambar" />
+                <span className="stage-caption">GAMBAR ASLI</span>
+              </> : <div className="empty-editor"><span className="empty-art"><span className="empty-art-back" /><span className="empty-art-front"><Icon name="resize" size={25} /></span></span>
+                <strong>Pratinjau gambar akan tampil di sini</strong><span>Pilih file untuk mulai mengubah ukuran</span></div>}
+              {resizeResult && <>
+                <div className="glass" style={{ padding: 14, borderRadius: 12, marginTop: 14, maxWidth: 320 }}>
+                  <img src={resizeResult} alt="Hasil resize" style={{ width: "100%", height: "auto", borderRadius: 8, background: "#15121d" }} />
+                  <button type="button" className="primary-tool-button full-button" onClick={downloadResize} style={{ marginTop: 10 }}>
+                    <Icon name="download" size={16} /> Unduh Hasil Resize
+                  </button>
+                </div>
+              </>}
+            </div>
+          </section>
         </section>
       )}
 
