@@ -811,18 +811,35 @@ export default function Home() {
 
   // ---------- QR Code ----------
   async function generateQr() {
-    if (!qrText.trim() || !window.QRCode) return;
+    if (!qrText.trim() || typeof window.QRCode !== "function") {
+      if (!qrText.trim()) toast("Masukkan teks atau URL terlebih dahulu", "error");
+      else toast("Library QR Code belum siap", "error");
+      return;
+    }
     setQrBusy(true);
     try {
-      const canvas = document.createElement("canvas");
-      await new Promise((resolve) => {
-        window.QRCode.toCanvas(canvas, qrText.trim(), {
-          width: Number(qrSize),
-          margin: 2,
-          color: { dark: qrColor, light: qrBgColor },
-        }, resolve);
+      const container = document.createElement("div");
+      container.style.position = "fixed";
+      container.style.left = "-9999px";
+      container.style.top = "0";
+      document.body.appendChild(container);
+      new window.QRCode(container, {
+        text: qrText.trim(),
+        width: Number(qrSize) || 300,
+        height: Number(qrSize) || 300,
+        colorDark: qrColor,
+        colorLight: qrBgColor,
+        correctLevel: window.QRCode.CorrectLevel.M,
       });
-      setQrImage(canvas.toDataURL("image/png"));
+      await new Promise((r) => setTimeout(r, 60));
+      const canvas = container.querySelector("canvas");
+      if (canvas) {
+        setQrImage(canvas.toDataURL("image/png"));
+      } else {
+        const svg = container.querySelector("svg");
+        setQrImage("data:image/svg+xml;base64," + btoa(svg.outerHTML));
+      }
+      document.body.removeChild(container);
       toast("QR Code berhasil dibuat", "success");
     } catch (err) {
       toast("Gagal membuat QR Code: " + (err.message || err), "error");
