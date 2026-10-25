@@ -932,9 +932,13 @@ export default function Home() {
         </a>
         <div className="topbar-actions">
           <div className="topbar-note"><span className="online-dot" /> Studio desain · file tetap di perangkat</div>
-          <a className="desktop-download-link" href={DESKTOP_DOWNLOAD_URL} target="_blank" rel="noreferrer">
+          <button className="desktop-download-link" type="button"
+            onClick={() => {
+              toast("Mengunduh aplikasi Windows...", "info", 3000);
+              window.location.href = DESKTOP_DOWNLOAD_URL;
+            }}>
             <Icon name="download" size={15} /> Aplikasi Windows
-          </a>
+          </button>
         </div>
       </header>
 
