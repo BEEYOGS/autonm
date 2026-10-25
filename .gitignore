@@ -1,4 +1,8 @@
 node_modules/
 .next/
 out/
+release/
+.desktop-build/
+__pycache__/
+*.py[cod]
 *.log

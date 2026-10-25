@@ -1,9 +1,9 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Stikerin — Generator Stiker Nama",
+  title: "Stikerin Studio — Studio Desain",
   description:
-    "Buat stiker nama dan nomor siap cetak dari file Excel. Cepat, praktis, dan gratis.",
+    "Studio desain Windows: generator stiker, pembesar gambar, penghapus latar manual, dan aset SVG berlisensi.",
   icons: {
     icon: "/icon.svg",
   },
