@@ -275,6 +275,7 @@ const TOOLS = [
   ["assets", "Cari aset", "search"],
   ["qr", "QR Code", "qr"],
   ["resize", "Ubah Ukuran", "resize"],
+  ["browser", "Browser", "external"],
 ];
 
 export default function Home() {
@@ -324,11 +325,91 @@ export default function Home() {
   const [assetFormat, setAssetFormat] = useState("svg");
   const [assetSource, setAssetSource] = useState("commons");
   const [showDownloadNotice, setShowDownloadNotice] = useState(false);
+  const [showAppDownload, setShowAppDownload] = useState(false);
+  const [appAssets, setAppAssets] = useState([]);
+  const [appLoading, setAppLoading] = useState(false);
+  const [appError, setAppError] = useState("");
+  const [appDownloaded, setAppDownloaded] = useState(() => {
+    try { return window.localStorage.getItem("stikerin-app-downloaded-v1") === "true"; }
+    catch { return false; }
+  });
+  const [browserUrl, setBrowserUrl] = useState("");
+  const [browserInput, setBrowserInput] = useState("");
+  const [browserLoading, setBrowserLoading] = useState(false);
+  const [browserError, setBrowserError] = useState("");
+  const [dismissedDownload, setDismissedDownload] = useState(() => {
+    try { return window.localStorage.getItem("stikerin-download-dismissed-v1") === "true"; }
+    catch { return false; }
+  });
+
+  function dismissDownload() {
+    setShowDownloadNotice(false);
+    setShowAppDownload(false);
+    try { window.localStorage.setItem("stikerin-download-dismissed-v1", "true"); setDismissedDownload(true); }
+    catch { setDismissedDownload(true); }
+  }
+
+  async function downloadAppAsset(asset) {
+    try {
+      toast("Mengunduh " + asset.name + "...", "info", 3000);
+      const res = await fetch(asset.browser_download_url);
+      if (!res.ok) throw new Error("Gagal mengunduh file");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = asset.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      try { window.localStorage.setItem("stikerin-app-downloaded-v1", "true"); setAppDownloaded(true); }
+      catch { setAppDownloaded(true); }
+      toast("Unduhan " + asset.name + " selesai", "success");
+      setShowAppDownload(false);
+    } catch (e) {
+      toast("Gagal mengunduh: " + (e.message || e), "error");
+    }
+  }
+
+  function openBrowser() {
+    const url = browserInput.trim();
+    if (!url) return;
+    let target = url;
+    if (!/^https?:\/\//i.test(target)) {
+      target = "https://www.google.com/search?q=" + encodeURIComponent(url);
+    }
+    setBrowserUrl(target);
+    setBrowserError("");
+    setBrowserLoading(true);
+  }
+
+  useEffect(() => {
+    if (window.navigator.userAgent.includes("Electron")) return undefined;
+    try {
+      if (window.localStorage.getItem("stikerin-download-dismissed-v1") === "true") {
+        return undefined;
+      }
+    } catch (storageError) {
+      console.warn("Preferensi pemberitahuan unduhan tidak dapat dibaca:", storageError);
+    }
+    const timeout = window.setTimeout(() => setShowDownloadNotice(true), 2400);
+    return () => window.clearTimeout(timeout);
+  }, []);
   const [qrText, setQrText] = useState("");
   const [qrSize, setQrSize] = useState(300);
   const [qrColor, setQrColor] = useState("#000000");
   const [qrBgColor, setQrBgColor] = useState("#ffffff");
   const [qrLevel, setQrLevel] = useState("M");
+  const [qrType, setQrType] = useState("text");
+  const [qrWifiSsid, setQrWifiSsid] = useState("");
+  const [qrWifiPass, setQrWifiPass] = useState("");
+  const [qrWifiEnc, setQrWifiEnc] = useState("WPA");
+  const [qrEmail, setQrEmail] = useState("");
+  const [qrPhone, setQrPhone] = useState("");
+  const [qrLogo, setQrLogo] = useState(null);
+  const [qrLogoPreview, setQrLogoPreview] = useState("");
+  const [qrShowLogo, setQrShowLogo] = useState(false);
   const [qrImage, setQrImage] = useState(null);
   const [qrBusy, setQrBusy] = useState(false);
   const [resizeFile, setResizeFile] = useState(null);
@@ -356,12 +437,7 @@ export default function Home() {
   }, []);
 
   function dismissDownloadNotice() {
-    setShowDownloadNotice(false);
-    try {
-      window.localStorage.setItem("stikerin-download-prompt-dismissed-v1", "true");
-    } catch (storageError) {
-      console.warn("Preferensi pemberitahuan unduhan tidak dapat disimpan:", storageError);
-    }
+    dismissDownload();
   }
 
   useEffect(() => {
@@ -929,6 +1005,8 @@ export default function Home() {
   }
 
   const isBusy = status === "processing" || status === "loading";
+  const isBrowser = typeof window !== "undefined" && window.navigator.userAgent.includes("Electron");
+  const showDownloadButton = !isBrowser && !appDownloaded && !dismissedDownload;
 
   return (
     <main className="app-shell">
@@ -952,17 +1030,75 @@ export default function Home() {
         </a>
         <div className="topbar-actions">
           <div className="topbar-note"><span className="online-dot" /> Studio desain · file tetap di perangkat</div>
-          <button className="desktop-download-link" type="button"
-            onClick={() => {
-              toast("Mengunduh aplikasi Windows...", "info", 3000);
-              window.location.href = DESKTOP_DOWNLOAD_URL;
-            }}>
-            <Icon name="download" size={15} /> Aplikasi Windows
-          </button>
+          {showDownloadButton && (
+            <button className="desktop-download-link" type="button"
+              onClick={async () => {
+                setShowAppDownload(true);
+                if (appAssets.length === 0 && !appLoading) {
+                  setAppLoading(true);
+                  setAppError("");
+                  try {
+                    const res = await fetch("https://api.github.com/repos/BEEYOGS/autonm/releases/latest", {
+                      headers: { "Accept": "application/vnd.github+json" },
+                    });
+                    const data = await res.json();
+                    if (!res.ok) throw new Error(data.message || "Gagal mengambil rilis");
+                    const assets = (data.assets || []).filter((a) => /\.(exe|msi)$/i.test(a.name));
+                    setAppAssets(assets);
+                    if (assets.length === 0) setAppError("Belum ada file installer (.exe/.msi) di rilis terbaru.");
+                  } catch (e) {
+                    setAppError(e.message || "Gagal mengambil daftar unduhan");
+                  } finally {
+                    setAppLoading(false);
+                  }
+                }
+              }}>
+              <Icon name="download" size={15} /> Aplikasi Windows
+            </button>
+          )}
         </div>
       </header>
 
-      {showDownloadNotice && (
+      {showAppDownload && (
+        <>
+          <div className="download-backdrop" onClick={() => setShowAppDownload(false)} />
+          <aside className="download-notice" role="dialog" aria-modal="true" aria-live="polite" style={{ width: "min(460px, calc(100vw - 32px))" }}>
+            <span className="download-notice-icon"><Icon name="download" size={19} /></span>
+            <div className="download-notice-copy" style={{ width: "100%" }}>
+              <strong>Unduh Aplikasi Windows</strong>
+              <span>Stikerin Studio — langsung unduh tanpa keluar halaman.</span>
+              {appLoading && <div className="tool-description" style={{ margin: "8px 0 0" }}>Memuat daftar file...</div>}
+              {appError && <div className="tool-error" role="status" style={{ marginTop: 8 }}>{appError}</div>}
+              {!appLoading && appAssets.length > 0 && (
+                <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+                  {appAssets.map((asset) => (
+                    <button key={asset.id} type="button"
+                      className="primary-tool-button"
+                      style={{ justifyContent: "space-between", width: "100%", cursor: "pointer" }}
+                      onClick={() => downloadAppAsset(asset)}>
+                      <span style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <Icon name="download" size={16} />
+                        {asset.name}
+                      </span>
+                      <span style={{ opacity: 0.8, fontSize: 9 }}>{Math.round(asset.size / 1024 / 1024 * 10) / 10} MB</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {!appLoading && appAssets.length === 0 && !appError && (
+                <a className="secondary-button" href={DESKTOP_DOWNLOAD_URL} target="_blank" rel="noreferrer" style={{ marginTop: 10, width: "100%" }}>
+                  Buka Halaman Rilis GitHub <Icon name="external" size={14} />
+                </a>
+              )}
+            </div>
+            <button className="download-notice-close" type="button" aria-label="Tutup" onClick={() => setShowAppDownload(false)}>
+              <Icon name="close" size={16} />
+            </button>
+          </aside>
+        </>
+      )}
+
+      {showDownloadNotice && !dismissedDownload && !appDownloaded && (
         <>
           <div className="download-backdrop" onClick={dismissDownloadNotice} />
           <aside className="download-notice" role="status" aria-live="polite">
@@ -1113,7 +1249,7 @@ export default function Home() {
         <section className="editor-page">
           <div className="tool-page-heading">
             <div className="section-kicker">{activeTool === "upscale" ? "PEMBESAR GAMBAR" : "PENGHAPUS LATAR"}</div>
-            <h1>{activeTool === "upscale" ? <>Beri asetmu ruang<br /><span>untuk tampil besar.</span></> : <>Rapikan latar<br /><span>dengan kontrolmu.</span></>}</h1>
+            <h1>{activeTool === "upscale" ? <>Beri asetmu ruang<br /><span>untuk tampil besar.</span></> : <>Hapus latar gambar<br /><span>secara otomatis.</span></>}</h1>
             <p>AI berjalan di perangkat Anda. Model hanya diunduh saat pertama kali dipakai.</p>
           </div>
           <section className="editor-card">
@@ -1144,31 +1280,32 @@ export default function Home() {
                     <><Icon name="image" size={17} /> {imageModels.available ? "AI perbesar & jernihkan" : "Perbesar gambar"}</>}</button>
               </>}
               {activeTool === "background" && <>
-                <div className="editor-label">Kuas manual · hanya gambar milik Anda</div>
                 <p className="tool-description">
-                  Sapukan kuas pada area latar untuk menjadikannya transparan.{" "}
+                  Hapus latar gambar secara otomatis dengan AI lokal di perangkat Anda.{" "}
                   {imageModels.available
                     ? imageModels.backgroundAiReady
-                      ? "AI lokal BiRefNet siap."
+                      ? "AI lokal siap. Hapus latar dalam beberapa detik."
                       : "Unduhan model AI pertama sekitar 214 MB."
-                    : "Mode AI lokal tersedia di aplikasi desktop."}
-                  {" "}Tidak ada penghapus watermark.
+                    : "AI lokal tersedia di aplikasi desktop Stikerin Studio."}
+                  Hasil bisa langsung diunduh sebagai PNG transparan.
                 </p>
                 <button type="button" className="primary-tool-button full-button" onClick={removeBackgroundAI}
                   disabled={!imageFile || !imageModels.available || imageBusy}>
                   {imageBusy ? <><span className="spinner" /> {imageModels.backgroundAiReady ? "Menghapus latar..." : "Mengunduh model AI..."}</> :
-                    <><Icon name="spark" size={17} /> Hapus latar otomatis · AI lokal</>}</button>
-                <div className="brush-modes" role="group" aria-label="Mode kuas">
-                  <button type="button" className={brushMode === "erase" ? "is-selected" : ""} aria-pressed={brushMode === "erase"} onClick={() => setBrushMode("erase")}>Hapus latar</button>
-                  <button type="button" className={brushMode === "restore" ? "is-selected" : ""} aria-pressed={brushMode === "restore"} onClick={() => setBrushMode("restore")}>Pulihkan</button>
+                    <><Icon name="spark" size={17} /> Hapus Latar Otomatis · AI Lokal</>}</button>
+                <div className="field-group" style={{ marginTop: 10 }}>
+                  <label className="field-label">Hasil hapus latar</label>
+                  <button type="button" className="input-field" style={{ justifyContent: "space-between", textAlign: "left", background: "#15121d" }}
+                    disabled={!backgroundDownload} onClick={() => { if (backgroundDownload) window.open(backgroundDownload, "_blank"); }}>
+                    {backgroundDownload ? "PNG transparan siap diunduh" : "Belum ada hasil"}
+                    <Icon name={backgroundDownload ? "download" : "close"} size={14} style={{ marginLeft: 8 }} />
+                  </button>
+                  {backgroundDownload && <a className="download-button result-download" href={backgroundDownload}
+                    download={`${imageFile?.name.replace(/\.[^.]+$/, "") || "gambar"}_transparan.png`}
+                    style={{ marginTop: 8 }}><Icon name="download" size={16} /> Unduh PNG Transparan</a>}
                 </div>
-                <label className="editor-label" htmlFor="brush-size">Ukuran kuas <b>{brushSize}px</b></label>
-                <input id="brush-size" className="brush-slider" type="range" min="6" max="120" value={brushSize}
-                  onChange={(event) => setBrushSize(Number(event.target.value))} />
                 <div className="editor-action-row"><button type="button" className="subtle-button" onClick={resetBackgroundMask} disabled={!imageFile}>
-                  <Icon name="undo" size={15} /> Reset</button>
-                  <button type="button" className="primary-tool-button" onClick={exportBackground} disabled={!backgroundDirty || imageBusy}>
-                    {imageBusy ? <><span className="spinner" /> Memproses...</> : <><Icon name="download" size={16} /> Ekspor PNG</>}</button></div>
+                  <Icon name="undo" size={15} /> Reset</button></div>
               </>}
               {processedImage && activeTool === "upscale" && <a className="download-button result-download" href={processedImage.url} download={processedImage.name}>
                 <Icon name="download" size={17} /> Unduh PNG · {processedImage.width} × {processedImage.height}</a>}
@@ -1179,6 +1316,12 @@ export default function Home() {
               {imagePreview ? activeTool === "upscale" ? <>
                 <img className="editor-preview" src={processedImage?.url || imagePreview} alt="Pratinjau gambar" />
                 <span className="stage-caption">{processedImage ? "HASIL PERBESAR" : "GAMBAR ASLI"}</span>
+              </> : activeTool === "background" ? backgroundDownload ? <>
+                <img className="editor-preview" src={backgroundDownload} alt="Hasil hapus latar" />
+                <span className="stage-caption">LATAR TELAH DIHAPUS · PNG TRANSPARAN</span>
+              </> : <>
+                <img className="editor-preview" src={imagePreview} alt="Gambar asli" />
+                <span className="stage-caption">GAMBAR ASLI · KLIK "HAPUS LATAR OTOMATIS"</span>
               </> : <>
                 <canvas ref={backgroundCanvasRef} className="background-canvas" aria-label="Kanvas penghapus latar"
                   onPointerDown={startBrushStroke} onPointerMove={continueBrushStroke}
@@ -1349,6 +1492,53 @@ export default function Home() {
                   </button>
                 </div>
               </>}
+            </div>
+          </section>
+        </section>
+      )}
+
+      {activeTool === "browser" && (
+        <section className="editor-page">
+          <div className="tool-page-heading">
+            <div className="section-kicker">BROWSER</div>
+            <h1>Cari &amp; jelajahi<br /><span>tanpa keluar app.</span></h1>
+            <p className="tool-intro">Ketik kata kunci atau URL, lalu tekan Enter. Hasil pencarian Google akan tampil di bawah.</p>
+          </div>
+          <section className="editor-card" style={{ gridTemplateColumns: "1fr" }}>
+            <div className="editor-sidebar" style={{ maxWidth: 900, margin: "0 auto", width: "100%" }}>
+              <div className="asset-search-form" style={{ width: "100%" }}>
+                <Icon name="search" size={20} />
+                <input type="search" placeholder="Cari di Google atau masukkan URL..."
+                  value={browserInput} onChange={(e) => setBrowserInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") openBrowser(); }} />
+                <button className="primary-tool-button" type="button" onClick={openBrowser}
+                  disabled={browserInput.trim().length < 2}>
+                  <Icon name="arrow" size={16} /> Cari
+                </button>
+              </div>
+              {browserError && <div className="tool-error" role="status" style={{ marginTop: 10 }}>{browserError}</div>}
+              {browserUrl && (
+                <div style={{ marginTop: 14, border: "1px solid #342b43", borderRadius: 12, overflow: "hidden", background: "#15121d" }}>
+                  <div style={{ padding: "10px 14px", display: "flex", alignItems: "center", gap: 10, borderBottom: "1px solid #342b43", background: "#1b1725" }}>
+                    <span style={{ color: "#a59bb7", fontSize: 10, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>{browserUrl}</span>
+                    <button className="subtle-button" type="button" onClick={() => { setBrowserUrl(""); setBrowserInput(""); setBrowserError(""); }} style={{ minHeight: 30, padding: "0 10px" }}>
+                      <Icon name="close" size={14} /> Tutup
+                    </button>
+                  </div>
+                  <iframe src={browserUrl} title="Browser" loading="lazy"
+                    style={{ width: "100%", height: 600, border: 0, background: "#fff" }}
+                    onLoad={() => setBrowserLoading(false)}
+                    onError={() => { setBrowserError("Halaman tidak dapat dimuat (mungkin diblokir oleh situs)."); setBrowserLoading(false); }} />
+                  {browserLoading && <div className="tool-description" style={{ padding: 14 }}>Memuat halaman...</div>}
+                </div>
+              )}
+              {!browserUrl && (
+                <div className="empty-editor" style={{ marginTop: 24 }}>
+                  <span className="empty-art"><span className="empty-art-back" /><span className="empty-art-front"><Icon name="external" size={25} /></span></span>
+                  <strong>Browser siap digunakan</strong>
+                  <span>Ketik kata kunci atau URL di atas, lalu tekan Enter atau klik Cari</span>
+                </div>
+              )}
             </div>
           </section>
         </section>
