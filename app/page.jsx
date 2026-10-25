@@ -326,6 +326,17 @@ export default function Home() {
   const [assetSource, setAssetSource] = useState("commons");
   const [showDownloadNotice, setShowDownloadNotice] = useState(false);
   const [showAppDownload, setShowAppDownload] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [commandQuery, setCommandQuery] = useState("");
+  const [dragOver, setDragOver] = useState(false);
+  const [theme, setTheme] = useState(() => {
+    try { return window.localStorage.getItem("stikerin-theme-v1") || "dark"; }
+    catch { return "dark"; }
+  });
+  const [recentTools, setRecentTools] = useState(() => {
+    try { return JSON.parse(window.localStorage.getItem("stikerin-recent-tools-v1") || "[]"); }
+    catch { return []; }
+  });
   const [appAssets, setAppAssets] = useState([]);
   const [appLoading, setAppLoading] = useState(false);
   const [appError, setAppError] = useState("");
@@ -422,6 +433,39 @@ export default function Home() {
   const [stickerBorder, setStickerBorder] = useState(false);
   const [stickerBorderColor, setStickerBorderColor] = useState("#000000");
   const [stickerBorderWidth, setStickerBorderWidth] = useState(4);
+
+  useEffect(() => {
+    function onKeyDown(event) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        setShowCommandPalette((v) => !v);
+      }
+      if (event.key === "Escape") {
+        setShowCommandPalette(false);
+        setShowAppDownload(false);
+        setShowDownloadNotice(false);
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
+
+  useEffect(() => {
+    try { window.localStorage.setItem("stikerin-theme-v1", theme); }
+    catch { /* ignore */ }
+    document.documentElement.dataset.theme = theme;
+  }, [theme]);
+
+  useEffect(() => {
+    try { window.localStorage.setItem("stikerin-recent-tools-v1", JSON.stringify(recentTools.slice(0, 8))); }
+    catch { /* ignore */ }
+  }, [recentTools]);
+
+  useEffect(() => {
+    if (activeTool && !recentTools.includes(activeTool)) {
+      setRecentTools((prev) => [activeTool, ...prev.filter((t) => t !== activeTool)].slice(0, 8));
+    }
+  }, [activeTool]);
 
   useEffect(() => {
     if (window.navigator.userAgent.includes("Electron")) return undefined;
@@ -1009,7 +1053,23 @@ export default function Home() {
   const showDownloadButton = !isBrowser && !appDownloaded && !dismissedDownload;
 
   return (
-    <main className="app-shell">
+    <main className="app-shell"
+      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+      onDragLeave={() => setDragOver(false)}
+      onDrop={(e) => {
+        e.preventDefault();
+        setDragOver(false);
+        const file = e.dataTransfer.files?.[0];
+        if (file) {
+          if (activeTool === "stickers" && (file.name.endsWith(".xlsx") || file.name.endsWith(".xls"))) {
+            // handled by file input
+          } else if (file.type.startsWith("image/")) {
+            handleImageFile(file);
+          } else {
+            toast("Format file tidak didukung untuk drag & drop", "warn");
+          }
+        }
+      }}>
       <div className="toast-container">
         {toasts.map((t) => (
           <div key={t.id} className={`toast ${t.type}`} role="status" aria-live="polite">
@@ -1023,6 +1083,35 @@ export default function Home() {
           </div>
         ))}
       </div>
+      {dragOver && (
+        <div className="drop-overlay">
+          <div style={{ textAlign: "center" }}>
+            <strong>Lepaskan file di sini</strong>
+            <span>Upload gambar atau Excel otomatis</span>
+          </div>
+        </div>
+      )}
+      {showCommandPalette && (
+        <>
+          <div className="command-palette-backdrop" onClick={() => setShowCommandPalette(false)} />
+          <div className="command-palette">
+            <input autoFocus placeholder="Cari tool... (Ctrl+K)"
+              value={commandQuery} onChange={(e) => setCommandQuery(e.target.value)} />
+            <div className="command-palette-list">
+              {TOOLS.filter(([_, label]) => label.toLowerCase().includes(commandQuery.toLowerCase())).length === 0 && (
+                <div className="command-palette-empty">Tidak ada tool yang cocok</div>
+              )}
+              {TOOLS.filter(([_, label]) => label.toLowerCase().includes(commandQuery.toLowerCase())).map(([tool, label, icon]) => (
+                <div key={tool} className={`command-palette-item ${activeTool === tool ? "is-active" : ""}`}
+                  onClick={() => { setActiveTool(tool); setShowCommandPalette(false); setCommandQuery(""); }}>
+                  <Icon name={icon} size={16} /> {label}
+                  <span>{tool.toUpperCase()}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
       <header className="topbar">
         <a className="brand" href="#" aria-label="Stikerin beranda">
           <span className="brand-mark"><Icon name="spark" size={21} /></span>
@@ -1030,6 +1119,10 @@ export default function Home() {
         </a>
         <div className="topbar-actions">
           <div className="topbar-note"><span className="online-dot" /> Studio desain · file tetap di perangkat</div>
+          <button className="theme-toggle" type="button" aria-label="Ganti tema" title="Ganti tema (gelap/terang)"
+            onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}>
+            <Icon name={theme === "dark" ? "spark" : "search"} size={16} />
+          </button>
           {showDownloadButton && (
             <button className="desktop-download-link" type="button"
               onClick={async () => {
@@ -1546,6 +1639,7 @@ export default function Home() {
 
       <footer className="page-footer"><span>Stikerin Studio · dibuat untuk proses desain yang lebih praktis.</span>
         <span>Privat di perangkat <span className="footer-lock">◆</span></span><span className="made-by">MADE BY <b>YD</b></span></footer>
+      <div className="shortcut-hint"><kbd>Ctrl</kbd> + <kbd>K</kbd> buka command palette · <kbd>Esc</kbd> tutup</div>
     </main>
   );
 }
