@@ -331,10 +331,6 @@ export default function Home() {
   const [showCommandPalette, setShowCommandPalette] = useState(false);
   const [commandQuery, setCommandQuery] = useState("");
   const [dragOver, setDragOver] = useState(false);
-  const [theme, setTheme] = useState(() => {
-    try { return window.localStorage.getItem("stikerin-theme-v1") || "dark"; }
-    catch { return "dark"; }
-  });
   const [recentTools, setRecentTools] = useState(() => {
     try { return JSON.parse(window.localStorage.getItem("stikerin-recent-tools-v1") || "[]"); }
     catch { return []; }
@@ -451,12 +447,6 @@ export default function Home() {
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
   }, []);
-
-  useEffect(() => {
-    try { window.localStorage.setItem("stikerin-theme-v1", theme); }
-    catch { /* ignore */ }
-    document.documentElement.dataset.theme = theme;
-  }, [theme]);
 
   useEffect(() => {
     try { window.localStorage.setItem("stikerin-recent-tools-v1", JSON.stringify(recentTools.slice(0, 8))); }
@@ -869,7 +859,7 @@ export default function Home() {
         if (!canvasBlob) throw new Error(`Gagal membuat gambar untuk nama "${name}".`);
         const stickerBlob = await addPngResolution(canvasBlob, PRINT_DPI);
         if (cancelledRef.current) return;
-        zip.file(Stiker_.png, stickerBlob);
+        zip.file(`Stiker_${String(index + 1).padStart(3, "0")}.png`, stickerBlob);
         nextStickers.push({ name, number: entries[index].number, preview: canvas.toDataURL("image/png") });
         setStickers([...nextStickers]);
         setProgress(Math.round(((index + 1) / entries.length) * 100));
@@ -1125,10 +1115,6 @@ export default function Home() {
         </a>
         <div className="topbar-actions">
           <div className="topbar-note"><span className="online-dot" /> Studio desain Â· file tetap di perangkat</div>
-          <button className="theme-toggle" type="button" aria-label="Ganti tema" title="Ganti tema (gelap/terang)"
-            onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}>
-            <Icon name={theme === "dark" ? "spark" : "search"} size={16} />
-          </button>
           {showDownloadButton && (
             <button className="desktop-download-link" type="button"
               onClick={async () => {
