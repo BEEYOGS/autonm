@@ -1153,7 +1153,8 @@ kbd {
 .toast.success { border-color: #4a7c17; box-shadow: 0 0 20px rgb(196 242 122 / 12%); }
 .toast.warn { border-color: #b45309; box-shadow: 0 0 20px rgb(251 191 36 / 12%); }
 .toast.error { border-color: #7f1d1d; box-shadow: 0 0 20px rgb(255 157 157 / 12%); }
-.toast-icon { width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; flex: 0 0 auto; font-size: 13px; }
+.toast-icon { width: 20px; height: 20px; border-radius: 6px; display: grid; place-items: center; flex: 0 0 auto; }
+.toast-icon svg { width: 14px; height: 14px; stroke-width: 1.6; }
 .toast.success .toast-icon { background: #65a30d; color: #fff; }
 .toast.warn .toast-icon { background: #b45309; color: #fff; }
 .toast.error .toast-icon { background: #7f1d1d; color: #fff; }
@@ -1524,4 +1525,59 @@ html[data-theme="light"] .desktop-download-link:hover { background: #e0d8f0; col
 .sticker-caption { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
 .empty-text, .empty-subtext { color: var(--muted); }
 .empty-subtext { font-size: 11px; }
+
+
+/* ---------- Responsive ---------- */
+@media (max-width: 640px) {
+  .app-shell { width: calc(100% - 24px); }
+  .topbar { height: 64px; padding: 0 10px; }
+  .brand { font-size: 18px; }
+  .brand-mark { width: 30px; height: 30px; border-radius: 10px; }
+  .topbar-note { font-size: 11px; gap: 6px; }
+  .topbar-actions { gap: 10px; }
+  .tool-switcher { margin: 18px auto 0; padding: 5px; border-radius: 12px; }
+  .tool-switcher button { min-height: 40px; padding: 0 14px; gap: 7px; font-size: 10px; }
+  .setup-card { border-radius: 16px; }
+  .dropzone { border-radius: 16px; padding: 24px 16px; }
+  .drop-copy strong { font-size: 15px; }
+  .drop-copy span { font-size: 12px; }
+  .color-controls { grid-template-columns: 1fr; gap: 12px; }
+  .option-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .option-label { font-size: 10px; }
+  .segmented-control { border-radius: 10px; padding: 3px; }
+  .segmented-control button { font-size: 10px; padding: 6px 12px; border-radius: 8px; }
+  .sticker-card { padding: 14px; }
+  .sticker-card-info b { font-size: 14px; }
+  .results-heading h2 { font-size: 18px; }
+  .toast-container { top: max(12px, env(safe-area-inset-top)); right: max(12px, env(safe-area-inset-right)); left: 12px; }
+  .toast { min-width: auto; width: auto; max-width: calc(100vw - 24px); font-size: 10.5px; padding: 10px 14px; border-radius: 10px; }
+  .toast-icon svg { width: 13px; height: 13px; }
+  .preview-panel { border-radius: 16px; }
+  .shortcut-hint { font-size: 11px; gap: 6px; }
+}
+
+@media (max-width: 480px) {
+  .topbar { height: 60px; }
+  .brand { font-size: 17px; gap: 8px; }
+  .brand-mark { width: 28px; height: 28px; }
+  .dropzone { padding: 20px 14px; }
+  .drop-copy strong { font-size: 14px; }
+  .color-controls { gap: 10px; }
+  .sticker-card { padding: 12px; }
+  .toast { font-size: 10px; padding: 10px 12px; }
+  .toast-icon svg { width: 12px; height: 12px; }
+}
+
+@media (min-width: 641px) and (max-width: 1024px) {
+  .app-shell { width: min(980px, calc(100% - 40px)); }
+  .toast-container { left: auto; right: max(20px, env(safe-area-inset-right)); }
+  .toast { min-width: 280px; max-width: 420px; }
+}
+
+/* Print-friendly adjustments */
+@media print {
+  .toast-container { display: none; }
+  .drop-overlay { display: none; }
+  .command-palette { display: none; }
+}
 

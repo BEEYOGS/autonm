@@ -1070,7 +1070,7 @@ export default function Home() {
         {toasts.map((t) => (
           <div key={t.id} className={`toast ${t.type}`} role="status" aria-live="polite">
             <span className="toast-icon">
-              {t.type === "success" ? "âœ”" : t.type === "error" ? "âœ–" : "â„¹"}
+              {t.type === "success" ? <Icon name="check" size={14} /> : t.type === "error" ? <Icon name="close" size={14} /> : t.type === "warn" ? <Icon name="spark" size={14} /> : <Icon name="spark" size={14} />}
             </span>
             <span>{t.message}</span>
             <button className="toast-close" onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}>
