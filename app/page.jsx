@@ -390,7 +390,7 @@ export default function Home() {
     if (!url) return;
     let target = url;
     if (!/^https?:\/\//i.test(target)) {
-      target = "https://www.google.com/search?q=" + encodeURIComponent(url);
+      target = "https://html.duckduckgo.com/html/?q=" + encodeURIComponent(url);
     }
     setBrowserUrl(target);
     setBrowserError("");
@@ -1617,13 +1617,13 @@ export default function Home() {
           <div className="tool-page-heading">
             <div className="section-kicker">BROWSER</div>
             <h1>Cari &amp; jelajahi<br /><span>tanpa keluar app.</span></h1>
-            <p className="tool-intro">Ketik kata kunci atau URL, lalu tekan Enter. Hasil pencarian Google akan tampil di bawah.</p>
+            <p className="tool-intro">Ketik kata kunci atau URL, lalu tekan Enter. Hasil pencarian akan tampil di bawah.</p>
           </div>
           <section className="editor-card" style={{ gridTemplateColumns: "1fr" }}>
             <div className="editor-sidebar" style={{ maxWidth: 900, margin: "0 auto", width: "100%" }}>
               <div className="asset-search-form" style={{ width: "100%" }}>
                 <Icon name="search" size={20} />
-                <input type="search" placeholder="Cari di Google atau masukkan URL..."
+                <input type="search" placeholder="Cari di DuckDuckGo atau masukkan URL..."
                   value={browserInput} onChange={(e) => setBrowserInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === "Enter") openBrowser(); }} />
                 <button className="primary-tool-button" type="button" onClick={openBrowser}
