@@ -1109,7 +1109,7 @@ export default function Home() {
         </>
       )}
       <header className="topbar">
-        <a className="brand" href="#" aria-label="Stikerin beranda">
+        <a className="brand hover-lift" href="#" aria-label="Stikerin beranda">
           <span className="brand-mark"><Icon name="spark" size={21} /></span>
           <span>stikerin<span className="brand-period">.</span></span>
         </a>
@@ -1218,12 +1218,12 @@ export default function Home() {
             <p>Upload daftar nama, atur warna sesukamu, lalu unduh semua stiker siap cetak sekaligus.</p>
           </section>
           <section className="workspace" aria-label="Buat stiker">
-            <div className="setup-card">
+            <div className="setup-card glass-panel slide-up">
               <div className="section-heading">
                 <div><div className="section-kicker">MULAI DI SINI</div><h2>Siapkan stikermu</h2></div>
                 <span className="step-pill"><span>01</span> / 02</span>
               </div>
-              <div className={`dropzone ${fileName ? "has-file" : ""}`} role="button" tabIndex={0}
+              <div className={`dropzone animate-in hover-lift ${fileName ? "has-file" : ""}`} role="button" tabIndex={0}
                 onClick={() => fileInputRef.current?.click()}
                 onKeyDown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
@@ -1247,11 +1247,11 @@ export default function Home() {
               <div className="settings-divider" />
               <div className="settings-heading"><span className="settings-icon"><Icon name="spark" size={18} /></span>
                 <div><h3>Atur tampilan</h3><p>Pilih kombinasi warna favoritmu</p></div></div>
-              <div className="color-controls">
+              <div className="color-controls glass-panel">
                 <ColorPicker label="Warna background" value={backgroundColor} onChange={setBackgroundColor} />
                 <ColorPicker label="Warna teks" value={textColor} onChange={setTextColor} />
               </div>
-              <div className="sticker-settings">
+              <div className="sticker-settings glass-panel slide-up">
                 <div className="sticker-settings-title"><span>Ukuran stiker</span><span>DALAM CM</span></div>
                 <div className="dimension-controls">
                   <label className="dimension-control"><span>Lebar</span><span className="dimension-input">
@@ -1331,11 +1331,11 @@ export default function Home() {
             </div>
           </section>
           {error && <div className="error-banner" role="alert">{error}</div>}
-          <section className="results-section"><div className="results-heading"><div><div className="section-kicker">HASIL GENERATOR</div>
+          <section className="results-section slide-up"><div className="results-heading"><div><div className="section-kicker">HASIL GENERATOR</div>
             <h2>Stiker kamu <span>{stickers.length > 0 ? stickers.length : ""}</span></h2></div>
             {status === "complete" && <button className="download-button" type="button" onClick={downloadZip} disabled={isZipping}>
               <Icon name="download" size={18} />{isZipping ? "Menyiapkan ZIP..." : "Download semua"}</button>}</div>
-            {stickers.length > 1 ? <div className="sticker-grid">{stickers.slice(1).map((sticker, index) => <article className="sticker-card"
+            {stickers.length > 1 ? <div className="sticker-grid stagger">{stickers.slice(1).map((sticker, index) => <article className="sticker-card hover-lift scale-in"
               key={`${sticker.number}-${index}`}><img src={sticker.preview} alt={`Stiker ${sticker.number}: ${sticker.name}`} />
               <div className="sticker-card-info"><span>STIKER {String(index + 2).padStart(2, "0")}</span>
                 <b>{sticker.number}. {sticker.name}</b></div></article>)}</div> :

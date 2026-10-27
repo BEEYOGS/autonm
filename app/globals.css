@@ -1371,3 +1371,157 @@ html[data-theme="light"] .recent-item:hover { border-color: var(--purple); backg
 html[data-theme="light"] .shortcut-hint { background: rgb(247 244 252 / 90%); border-color: #d8d0e6; color: #6b6380; }
 html[data-theme="light"] .desktop-download-link { background: #f0ecf7; color: #4c3a6b; }
 html[data-theme="light"] .desktop-download-link:hover { background: #e0d8f0; color: #3b2a5a; }
+
+/* ---------- Animations ---------- */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(18px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.94); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+@keyframes bounceIn {
+  0% { opacity: 0; transform: scale(0.6); }
+  60% { opacity: 1; transform: scale(1.04); }
+  100% { transform: scale(1); }
+}
+
+/* ---------- Animation utilities ---------- */
+.animate-in { animation: fadeIn var(--transition) both; }
+.fade-in { animation: fadeIn 400ms ease both; }
+.slide-up { animation: slideUp 500ms cubic-bezier(0.18, 0.89, 0.32, 1.28) both; }
+.scale-in { animation: scaleIn 350ms cubic-bezier(0.18, 0.89, 0.32, 1.28) both; }
+.bounce-in { animation: bounceIn 450ms cubic-bezier(0.18, 0.89, 0.32, 1.28) both; }
+.spin { animation: spin 1s linear infinite; }
+.float { animation: float 4s ease-in-out infinite; }
+.pulse { animation: pulse 2s ease-in-out infinite; }
+
+/* Staggered children */
+.stagger > * { opacity: 0; animation-fill-mode: both; animation-name: slideUp; animation-duration: 450ms; animation-timing-function: cubic-bezier(0.18, 0.89, 0.32, 1.28); }
+.stagger > :nth-child(1) { animation-delay: 60ms; }
+.stagger > :nth-child(2) { animation-delay: 140ms; }
+.stagger > :nth-child(3) { animation-delay: 220ms; }
+.stagger > :nth-child(4) { animation-delay: 300ms; }
+.stagger > :nth-child(5) { animation-delay: 380ms; }
+.stagger > :nth-child(6) { animation-delay: 460ms; }
+
+/* ---------- Professional refinements ---------- */
+.glass-panel {
+  background: rgb(25 22 34 / 82%);
+  backdrop-filter: blur(16px);
+  border: 1px solid rgba(255 255 255 / 6%);
+  box-shadow: var(--shadow);
+}
+.hover-lift {
+  transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
+}
+.hover-lift:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 20px 48px rgb(0 0 0 / 45%);
+}
+.shimmer-text {
+  background: linear-gradient(90deg, #8e84a0 25%, #d6cfe6 50%, #8e84a0 75%);
+  background-size: 200% 100%;
+  animation: shimmer 2s infinite;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(135deg, var(--purple), var(--purple-glow));
+  color: #161226;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  cursor: pointer;
+  transition: all 180ms ease;
+  box-shadow: 0 0 0 1px rgba(255 255 255 / 8%);
+}
+.btn-primary:hover {
+  filter: brightness(1.12);
+  transform: translateY(-1px);
+  box-shadow: 0 12px 32px rgb(124 58 237 / 35%);
+}
+.btn-primary:active { transform: translateY(1px); filter: brightness(0.95); }
+.btn-primary:disabled { opacity: 0.55; cursor: not-allowed; filter: grayscale(1); }
+
+.option-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.option-label {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.9px;
+  white-space: nowrap;
+}
+.segmented-control {
+  display: inline-flex;
+  gap: 2px;
+  border: 1px solid #322a40;
+  border-radius: 10px;
+  background: rgb(25 22 34 / 60%);
+  padding: 3px;
+}
+.segmented-control button {
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #a59bb7;
+  font-size: 11px;
+  font-weight: 650;
+  cursor: pointer;
+  padding: 7px 14px;
+  transition: all 180ms ease;
+}
+.segmented-control button.is-selected {
+  background: #332746;
+  color: #e0d2ff;
+  box-shadow: inset 0 0 0 1px #574375;
+}
+.segmented-control button:hover:not(.is-active) { color: #e8e0f2; }
+
+.toast {
+  animation: slideUp 350ms cubic-bezier(0.18, 0.89, 0.32, 1.28) both;
+}
+.command-palette { animation: scaleIn 220ms ease both; }
+.dropzone { transition: border-color var(--transition), background var(--transition); }
+
+.settings-divider { height: 1px; background: var(--line); margin: 14px 0; }
+.settings-heading { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+.settings-icon { color: var(--purple); }
+.settings-heading h3 { margin: 0; font-size: 16px; font-weight: 700; letter-spacing: -0.5px; color: var(--ink); }
+.settings-heading p { margin: 2px 0 0; font-size: 11.5px; color: var(--muted); }
+
+.sticker-caption { color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+.empty-text, .empty-subtext { color: var(--muted); }
+.empty-subtext { font-size: 11px; }
+
