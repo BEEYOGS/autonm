@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
 import JSZip from "jszip";
@@ -273,11 +273,7 @@ async function readEntries(file) {
 
 const TOOLS = [
   ["stickers", "Stiker nama", "sticker"],
-  ["upscale", "Perbesar", "image"],
-  ["background", "Hapus latar", "brush"],
-  ["assets", "Cari aset", "search"],
   ["qr", "QR Code", "qr"],
-  ["resize", "Ubah Ukuran", "resize"],
   ["browser", "Browser", "external"],
 ];
 
@@ -285,6 +281,7 @@ export default function Home() {
   const fileInputRef = useRef(null);
   const imageInputRef = useRef(null);
   const zipRef = useRef(null);
+  const cancelledRef = useRef(false);
   const backgroundCanvasRef = useRef(null);
   const maskCanvasRef = useRef(null);
   const baseImageRef = useRef(null);
@@ -622,7 +619,7 @@ export default function Home() {
       const width = image.naturalWidth * scale;
       const height = image.naturalHeight * scale;
       if (width > 16384 || height > 16384 || width * height > 40000000) {
-        throw new Error("Hasil melebihi batas aman 40 megapiksel. Coba skala 2× atau gambar yang lebih kecil.");
+        throw new Error("Hasil melebihi batas aman 40 megapiksel. Coba skala 2Ã— atau gambar yang lebih kecil.");
       }
       let blob;
       if (imageModels.available) {
@@ -797,9 +794,9 @@ export default function Home() {
       setAssetSearchBusy(false);
     }
   }
-
-  useEffect(() => {
-    if (entries.length === 0) return undefined;
+  async function regenerateStickers() {
+    cancelledRef.current = true;
+    if (entries.length === 0) return;
     const widthCm = Number(stickerWidth);
     const heightCm = Number(stickerHeight);
     if (!Number.isFinite(widthCm) || widthCm < 2 || widthCm > 30 ||
@@ -808,89 +805,89 @@ export default function Home() {
       setStickers([]);
       setStatus("error");
       setError("Ukuran stiker harus antara 2–30 cm untuk lebar dan 1–15 cm untuk tinggi.");
-      return undefined;
+      return;
     }
-    let cancelled = false;
-    async function createStickers() {
-      const zip = new JSZip();
-      const nextStickers = [];
-      setStatus("processing");
-      setProgress(0);
-      setError("");
-      setStickers([]);
-      zipRef.current = null;
-      try {
-        for (let index = 0; index < entries.length; index += 1) {
-          if (cancelled) return;
-          let finalNumber = "";
-          if (numberingMode === "with") finalNumber = entries[index].number;
-          else if (numberingMode === "auto") finalNumber = String(index + 1);
-          const { name, number } = entries[index];
-          const label = finalNumber ? `${finalNumber}. ${applyCase(name, caseMode)}` : applyCase(name, caseMode);
-          const canvas = document.createElement("canvas");
-          canvas.width = Math.round((widthCm * PRINT_DPI) / 2.54);
-          canvas.height = Math.round((heightCm * PRINT_DPI) / 2.54);
-          const context = canvas.getContext("2d");
-          if (!context) throw new Error("Browser tidak mendukung pembuatan gambar.");
-          const cornerRadius = Math.min(canvas.height * 0.18, canvas.width * 0.08);
-          context.beginPath();
-          if (stickerShape === "rounded") {
-            context.moveTo(cornerRadius, 0);
-            context.lineTo(canvas.width - cornerRadius, 0);
-            context.quadraticCurveTo(canvas.width, 0, canvas.width, cornerRadius);
-            context.lineTo(canvas.width, canvas.height - cornerRadius);
-            context.quadraticCurveTo(canvas.width, canvas.height, canvas.width - cornerRadius, canvas.height);
-            context.lineTo(cornerRadius, canvas.height);
-            context.quadraticCurveTo(0, canvas.height, 0, canvas.height - cornerRadius);
-            context.lineTo(0, cornerRadius);
-            context.quadraticCurveTo(0, 0, cornerRadius, 0);
-          } else context.rect(0, 0, canvas.width, canvas.height);
-          context.closePath();
-          context.clip();
-          context.fillStyle = backgroundColor;
-          context.fillRect(0, 0, canvas.width, canvas.height);
-          if (stickerBorder) {
-            context.lineWidth = stickerBorderWidth;
-            context.strokeStyle = stickerBorderColor;
-            context.strokeRect(stickerBorderWidth / 2, stickerBorderWidth / 2,
-              canvas.width - stickerBorderWidth, canvas.height - stickerBorderWidth);
-          }
-          context.fillStyle = textColor;
-          context.textAlign = textAlign;
-          context.textBaseline = "middle";
-
-          const maxFontSize = canvas.height * 0.322;
-          const horizontalPadding = canvas.width * 0.094;
-          const maxTextWidth = canvas.width - horizontalPadding * 2;
-          const textX = textAlign === "left" ? horizontalPadding :
-            textAlign === "right" ? canvas.width - horizontalPadding : canvas.width / 2;
-          context.font = `700 ${maxFontSize}px "Arial", "Microsoft YaHei", sans-serif`;
-          const measuredWidth = context.measureText(label).width;
-          const fontSize = measuredWidth > maxTextWidth ? (maxFontSize * maxTextWidth) / measuredWidth : maxFontSize;
-          context.font = `700 ${fontSize}px "Arial", "Microsoft YaHei", sans-serif`;
-          context.fillText(label, textX, canvas.height / 2);
-          const canvasBlob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
-          if (!canvasBlob) throw new Error(`Gagal membuat gambar untuk nama "${name}".`);
-          const stickerBlob = await addPngResolution(canvasBlob, PRINT_DPI);
-          if (cancelled) return;
-          zip.file(`Stiker_${String(index + 1).padStart(3, "0")}.png`, stickerBlob);
-          nextStickers.push({ name, number, preview: canvas.toDataURL("image/png") });
-          setStickers([...nextStickers]);
-          setProgress(Math.round(((index + 1) / entries.length) * 100));
-          await new Promise((resolve) => window.setTimeout(resolve, 8));
+    cancelledRef.current = false;
+    const zip = new JSZip();
+    const nextStickers = [];
+    setStatus("processing");
+    setProgress(0);
+    setError("");
+    setStickers([]);
+    zipRef.current = null;
+    try {
+      for (let index = 0; index < entries.length; index += 1) {
+        if (cancelledRef.current) return;
+        let finalNumber = "";
+        if (numberingMode === "with") finalNumber = entries[index].number;
+        else if (numberingMode === "auto") finalNumber = String(index + 1);
+        const { name } = entries[index];
+        const label = finalNumber ? `${finalNumber}. ${applyCase(name, caseMode)}` : applyCase(name, caseMode);
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round((widthCm * PRINT_DPI) / 2.54);
+        canvas.height = Math.round((heightCm * PRINT_DPI) / 2.54);
+        const context = canvas.getContext("2d");
+        if (!context) throw new Error("Browser tidak mendukung pembuatan gambar.");
+        const cornerRadius = Math.min(canvas.height * 0.18, canvas.width * 0.08);
+        context.beginPath();
+        if (stickerShape === "rounded") {
+          context.moveTo(cornerRadius, 0);
+          context.lineTo(canvas.width - cornerRadius, 0);
+          context.quadraticCurveTo(canvas.width, 0, canvas.width, cornerRadius);
+          context.lineTo(canvas.width, canvas.height - cornerRadius);
+          context.quadraticCurveTo(canvas.width, canvas.height, canvas.width - cornerRadius, canvas.height);
+          context.lineTo(cornerRadius, canvas.height);
+          context.quadraticCurveTo(0, canvas.height, 0, canvas.height - cornerRadius);
+          context.lineTo(0, cornerRadius);
+          context.quadraticCurveTo(0, 0, cornerRadius, 0);
+        } else context.rect(0, 0, canvas.width, canvas.height);
+        context.closePath();
+        context.clip();
+        context.fillStyle = backgroundColor;
+        context.fillRect(0, 0, canvas.width, canvas.height);
+        if (stickerBorder) {
+          context.lineWidth = stickerBorderWidth;
+          context.strokeStyle = stickerBorderColor;
+          context.strokeRect(stickerBorderWidth / 2, stickerBorderWidth / 2,
+            canvas.width - stickerBorderWidth, canvas.height - stickerBorderWidth);
         }
-        if (cancelled) return;
-        zipRef.current = zip;
-        setStatus("complete");
-      } catch (generationError) {
-        if (cancelled) return;
-        console.error("Error membuat stiker:", generationError);
-        setStatus("error");
-        setError(generationError.message || "Gagal membuat stiker.");
+        context.fillStyle = textColor;
+        context.textAlign = textAlign;
+        context.textBaseline = "middle";
+
+        const maxFontSize = canvas.height * 0.322;
+        const horizontalPadding = canvas.width * 0.094;
+        const maxTextWidth = canvas.width - horizontalPadding * 2;
+        const textX = textAlign === "left" ? horizontalPadding :
+          textAlign === "right" ? canvas.width - horizontalPadding : canvas.width / 2;
+        context.font = `700 ${maxFontSize}px "Arial", "Microsoft YaHei", sans-serif`;
+        const measuredWidth = context.measureText(label).width;
+        const fontSize = measuredWidth > maxTextWidth ? (maxFontSize * maxTextWidth) / measuredWidth : maxFontSize;
+        context.font = `700 ${fontSize}px "Arial", "Microsoft YaHei", sans-serif`;
+        context.fillText(label, textX, canvas.height / 2);
+        const canvasBlob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
+        if (!canvasBlob) throw new Error(`Gagal membuat gambar untuk nama "${name}".`);
+        const stickerBlob = await addPngResolution(canvasBlob, PRINT_DPI);
+        if (cancelledRef.current) return;
+        zip.file(Stiker_.png, stickerBlob);
+        nextStickers.push({ name, number: entries[index].number, preview: canvas.toDataURL("image/png") });
+        setStickers([...nextStickers]);
+        setProgress(Math.round(((index + 1) / entries.length) * 100));
+        await new Promise((resolve) => window.setTimeout(resolve, 8));
       }
+      if (cancelledRef.current) return;
+      zipRef.current = zip;
+      setStatus("complete");
+    } catch (generationError) {
+      if (cancelledRef.current) return;
+      console.error("Error membuat stiker:", generationError);
+      setStatus("error");
+      setError(generationError.message || "Gagal membuat stiker.");
     }
-    createStickers();
-    return () => { cancelled = true; };
+  }
+
+  useEffect(() => {
+    regenerateStickers();
   }, [entries, backgroundColor, textColor, stickerWidth, stickerHeight, stickerShape, textAlign, numberingMode, caseMode, stickerBorder, stickerBorderColor, stickerBorderWidth]);
 
   async function handleFile(file) {
@@ -1017,7 +1014,7 @@ export default function Home() {
       const origH = img.naturalHeight;
       const w = resizeWidth ? Number(resizeWidth) : Math.round((Number(resizeHeight) / origH) * origW);
       const h = resizeHeight ? Number(resizeHeight) : Math.round((Number(resizeWidth) / origW) * origH);
-      if (w > 4096 || h > 4096) throw new Error("Ukuran maksimal 4096×4096 px.");
+      if (w > 4096 || h > 4096) throw new Error("Ukuran maksimal 4096Ã—4096 px.");
       const canvas = document.createElement("canvas");
       canvas.width = w;
       canvas.height = h;
@@ -1083,7 +1080,7 @@ export default function Home() {
         {toasts.map((t) => (
           <div key={t.id} className={`toast ${t.type}`} role="status" aria-live="polite">
             <span className="toast-icon">
-              {t.type === "success" ? "✔" : t.type === "error" ? "✖" : "ℹ"}
+              {t.type === "success" ? "âœ”" : t.type === "error" ? "âœ–" : "â„¹"}
             </span>
             <span>{t.message}</span>
             <button className="toast-close" onClick={() => setToasts((prev) => prev.filter((x) => x.id !== t.id))}>
@@ -1127,7 +1124,7 @@ export default function Home() {
           <span>stikerin<span className="brand-period">.</span></span>
         </a>
         <div className="topbar-actions">
-          <div className="topbar-note"><span className="online-dot" /> Studio desain · file tetap di perangkat</div>
+          <div className="topbar-note"><span className="online-dot" /> Studio desain Â· file tetap di perangkat</div>
           <button className="theme-toggle" type="button" aria-label="Ganti tema" title="Ganti tema (gelap/terang)"
             onClick={() => setTheme((t) => (t === "dark" ? "light" : "dark"))}>
             <Icon name={theme === "dark" ? "spark" : "search"} size={16} />
@@ -1168,7 +1165,7 @@ export default function Home() {
             <span className="download-notice-icon"><Icon name="download" size={19} /></span>
             <div className="download-notice-copy" style={{ width: "100%" }}>
               <strong>Unduh Aplikasi Windows</strong>
-              <span>Stikerin Studio — langsung unduh tanpa keluar halaman.</span>
+              <span>Stikerin Studio â€” langsung unduh tanpa keluar halaman.</span>
               {appLoading && <div className="tool-description" style={{ margin: "8px 0 0" }}>Memuat daftar file...</div>}
               {appError && <div className="tool-error" role="status" style={{ marginTop: 8 }}>{appError}</div>}
               {!appLoading && appAssets.length > 0 && (
@@ -1252,7 +1249,7 @@ export default function Home() {
                 onDrop={(event) => { event.preventDefault(); handleFile(event.dataTransfer.files[0]); }}>
                 <span className="upload-icon"><Icon name={fileName ? "file" : "upload"} size={23} /></span>
                 <span className="drop-copy"><strong>{fileName || "Klik untuk upload file Excel"}</strong>
-                  <span>{fileName ? "File siap diproses" : "atau tarik file ke sini · .XLSX, .XLS"}</span></span>
+                  <span>{fileName ? "File siap diproses" : "atau tarik file ke sini Â· .XLSX, .XLS"}</span></span>
                 {fileName ? <button type="button" className="clear-file" aria-label="Hapus file" onClick={(event) => {
                   event.stopPropagation(); resetProject();
                 }}><Icon name="close" size={17} /></button> :
@@ -1275,7 +1272,7 @@ export default function Home() {
                     <input type="number" min="2" max="30" step="0.1" value={stickerWidth} aria-label="Lebar stiker dalam sentimeter"
                       onChange={(event) => setStickerWidth(event.target.value)}
                       onBlur={() => { const value = Number(stickerWidth); setStickerWidth(String(Math.min(30, Math.max(2, Number.isFinite(value) ? value : 9)))); }} />
-                    <span>cm</span></span></label><span className="dimension-times">×</span>
+                    <span>cm</span></span></label><span className="dimension-times">Ã—</span>
                   <label className="dimension-control"><span>Tinggi</span><span className="dimension-input">
                     <input type="number" min="1" max="15" step="0.1" value={stickerHeight} aria-label="Tinggi stiker dalam sentimeter"
                       onChange={(event) => setStickerHeight(event.target.value)}
@@ -1297,7 +1294,7 @@ export default function Home() {
                     ["none", "Hanya Nama"]
                   ].map(([value, label]) => <button key={value} type="button"
                     className={numberingMode === value ? "is-selected" : ""} aria-pressed={numberingMode === value}
-                    onClick={() => setNumberingMode(value)}>{label}</button>)}</div></div>
+                    onClick={() => { setNumberingMode(value); regenerateStickers(); }}>{label}</button>)}</div></div>
                 <div className="option-row"><span className="option-label">Format nama</span><div className="segmented-control" role="group" aria-label="Format nama">
                   {[
                     ["normal", "Normal"],
@@ -1305,7 +1302,7 @@ export default function Home() {
                     ["lower", "lowercase"]
                   ].map(([value, label]) => <button key={value} type="button"
                     className={caseMode === value ? "is-selected" : ""} aria-pressed={caseMode === value}
-                    onClick={() => setCaseMode(value)}>{label}</button>)}</div></div>
+                    onClick={() => { setCaseMode(value); regenerateStickers(); }}>{label}</button>)}</div></div>
                 <div className="option-row"><span className="option-label">Bingkai tepi</span>
                   <div className="segmented-control" role="group" aria-label="Bingkai stiker">
                     <button key="off" type="button"
@@ -1327,8 +1324,8 @@ export default function Home() {
                 </div>}
               </div>
               <div className="size-note"><span className="size-note-icon"><Icon name="layers" size={16} /></span>
-                <span>Ukuran stiker <b>{stickerWidth || "0"} × {stickerHeight || "0"} cm</b>
-                  <small>Resolusi cetak {PRINT_DPI} DPI · {stickerShape === "rounded" ? "Rounded" : "Kotak"}</small></span>
+                <span>Ukuran stiker <b>{stickerWidth || "0"} Ã— {stickerHeight || "0"} cm</b>
+                  <small>Resolusi cetak {PRINT_DPI} DPI Â· {stickerShape === "rounded" ? "Rounded" : "Kotak"}</small></span>
                 <span className="size-tag">SIAP CETAK</span></div>
             </div>
             <div className="preview-panel">
@@ -1341,7 +1338,7 @@ export default function Home() {
                 <span className="empty-art-front"><Icon name="spark" size={25} /></span></span>
                 <strong>Preview-mu tampil di sini</strong><span>Upload file Excel untuk mulai membuat stiker</span></div>}</div>
               <div className="preview-footer"><div className="counter"><span className="counter-icon"><Icon name="layers" size={17} /></span>
-                <span><b>{stickers.length}</b> <small>/ {entries.length || "—"} stiker</small></span></div>
+                <span><b>{stickers.length}</b> <small>/ {entries.length || "â€”"} stiker</small></span></div>
                 {entries.length > 0 && <span className="progress-label">{status === "complete" ? "Semua stiker selesai" : `${progress}% selesai`}</span>}</div>
               <div className="progress-track" role="progressbar" aria-label="Progres pembuatan stiker"
                 aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}><span style={{ width: `${progress}%` }} /></div>
@@ -1376,20 +1373,20 @@ export default function Home() {
               <button className={`dropzone image-dropzone ${imageFile ? "has-file" : ""}`} type="button"
                 onClick={() => imageInputRef.current?.click()}><span className="upload-icon"><Icon name="upload" size={22} /></span>
                 <span className="drop-copy"><strong>{imageFile?.name || "Pilih gambar"}</strong>
-                  <span>PNG, JPG, WebP · maksimal 20 MB</span></span><Icon name="arrow" size={16} /></button>
+                  <span>PNG, JPG, WebP Â· maksimal 20 MB</span></span><Icon name="arrow" size={16} /></button>
               <input ref={imageInputRef} className="visually-hidden" type="file" accept="image/png,image/jpeg,image/webp"
                 onChange={(event) => { const file = event.target.files[0]; event.target.value = ""; handleImageFile(file); }} />
               {imageError && <div className="tool-error" role="alert">{imageError}</div>}
               {activeTool === "upscale" && <>
                 <label className="editor-label" htmlFor="upscale-factor">Skala pembesaran</label>
                 <select id="upscale-factor" className="editor-select" value={upscaleFactor} onChange={(event) => setUpscaleFactor(event.target.value)}>
-                  <option value="2">2× · seimbang</option><option value="4">4× · maksimal</option>
+                  <option value="2">2Ã— Â· seimbang</option><option value="4">4Ã— Â· maksimal</option>
                 </select>
                 <p className="tool-description">
                   {imageModels.available
                     ? imageModels.upscalerAiReady
-                      ? "Real-ESRGAN x4v3 siap · AI lokal."
-                      : "AI lokal Real-ESRGAN · unduhan pertama sekitar 5 MB."
+                      ? "Real-ESRGAN x4v3 siap Â· AI lokal."
+                      : "AI lokal Real-ESRGAN Â· unduhan pertama sekitar 5 MB."
                     : "AI tersedia di aplikasi desktop. Mode browser memperbesar tanpa AI."}
                   {" "}Pemrosesan memakai CPU dan berusaha memulihkan detail gambar.
                 </p>
@@ -1410,7 +1407,7 @@ export default function Home() {
                 <button type="button" className="primary-tool-button full-button" onClick={removeBackgroundAI}
                   disabled={!imageFile || !imageModels.available || imageBusy}>
                   {imageBusy ? <><span className="spinner" /> {imageModels.backgroundAiReady ? "Menghapus latar..." : "Mengunduh model AI..."}</> :
-                    <><Icon name="spark" size={17} /> Hapus Latar Otomatis · AI Lokal</>}</button>
+                    <><Icon name="spark" size={17} /> Hapus Latar Otomatis Â· AI Lokal</>}</button>
                 <div className="field-group" style={{ marginTop: 10 }}>
                   <label className="field-label">Hasil hapus latar</label>
                   <button type="button" className="input-field" style={{ justifyContent: "space-between", textAlign: "left", background: "#15121d" }}
@@ -1426,7 +1423,7 @@ export default function Home() {
                   <Icon name="undo" size={15} /> Reset</button></div>
               </>}
               {processedImage && activeTool === "upscale" && <a className="download-button result-download" href={processedImage.url} download={processedImage.name}>
-                <Icon name="download" size={17} /> Unduh PNG · {processedImage.width} × {processedImage.height}</a>}
+                <Icon name="download" size={17} /> Unduh PNG Â· {processedImage.width} Ã— {processedImage.height}</a>}
               {backgroundDownload && activeTool === "background" && <a className="download-button result-download" href={backgroundDownload}
                 download={`${imageFile?.name.replace(/\.[^.]+$/, "") || "gambar"}_transparan.png`}><Icon name="download" size={17} /> Unduh PNG transparan</a>}
             </div>
@@ -1436,10 +1433,10 @@ export default function Home() {
                 <span className="stage-caption">{processedImage ? "HASIL PERBESAR" : "GAMBAR ASLI"}</span>
               </> : activeTool === "background" ? backgroundDownload ? <>
                 <img className="editor-preview" src={backgroundDownload} alt="Hasil hapus latar" />
-                <span className="stage-caption">LATAR TELAH DIHAPUS · PNG TRANSPARAN</span>
+                <span className="stage-caption">LATAR TELAH DIHAPUS Â· PNG TRANSPARAN</span>
               </> : <>
                 <img className="editor-preview" src={imagePreview} alt="Gambar asli" />
-                <span className="stage-caption">GAMBAR ASLI · KLIK "HAPUS LATAR OTOMATIS"</span>
+                <span className="stage-caption">GAMBAR ASLI Â· KLIK "HAPUS LATAR OTOMATIS"</span>
               </> : <>
                 <canvas ref={backgroundCanvasRef} className="background-canvas" aria-label="Kanvas penghapus latar"
                   onPointerDown={startBrushStroke} onPointerMove={continueBrushStroke}
@@ -1475,7 +1472,7 @@ export default function Home() {
               <button className="primary-tool-button" type="submit" disabled={assetSearchBusy || assetQuery.trim().length < 2}>
                 {assetSearchBusy ? <><span className="spinner" /> Mencari</> : `Cari ${assetFormat.toUpperCase()}`}<Icon name="arrow" size={16} /></button>
             </form>
-            <div className="asset-search-hint"><span>SUMBER</span> Wikimedia Commons · {assetFormat.toUpperCase()} lisensi bebas · hasil memuat tautan sumber dan lisensi.</div>
+            <div className="asset-search-hint"><span>SUMBER</span> Wikimedia Commons Â· {assetFormat.toUpperCase()} lisensi bebas Â· hasil memuat tautan sumber dan lisensi.</div>
           </section>
           {assetSearchError && <div className="tool-error" role="status">{assetSearchError}</div>}
           {assetResults.length > 0 && <div className="asset-results-grid">
@@ -1574,7 +1571,7 @@ export default function Home() {
                 <button className="dropzone image-dropzone" type="button" onClick={() => imageInputRef.current?.click()}>
                   <span className="upload-icon"><Icon name="upload" size={22} /></span>
                   <span className="drop-copy"><strong>{resizeFile?.name || "Pilih gambar"}</strong>
-                    <span>PNG, JPG, WebP · maksimal 20 MB</span></span><Icon name="arrow" size={16} /></button>
+                    <span>PNG, JPG, WebP Â· maksimal 20 MB</span></span><Icon name="arrow" size={16} /></button>
                 <input ref={imageInputRef} className="visually-hidden" type="file" accept="image/png,image/jpeg,image/webp"
                   onChange={(event) => { const file = event.target.files[0]; event.target.value = ""; handleResizeFile(file); }} />
                 {resizePreview && <div className="tool-error" role="status" style={{ borderColor: "#4a7c17", color: "#c4f27a", background: "#17141f" }}>{resizeFile?.name} siap diubah ukurannya</div>}
@@ -1662,9 +1659,9 @@ export default function Home() {
         </section>
       )}
 
-      <footer className="page-footer"><span>Stikerin Studio · dibuat untuk proses desain yang lebih praktis.</span>
-        <span>Privat di perangkat <span className="footer-lock">◆</span></span><span className="made-by">MADE BY <b>YD</b></span></footer>
-      <div className="shortcut-hint"><kbd>Ctrl</kbd> + <kbd>K</kbd> buka command palette · <kbd>Esc</kbd> tutup</div>
+      <footer className="page-footer"><span>Stikerin Studio Â· dibuat untuk proses desain yang lebih praktis.</span>
+        <span>Privat di perangkat <span className="footer-lock">â—†</span></span><span className="made-by">MADE BY <b>YD</b></span></footer>
+
     </main>
   );
 }
