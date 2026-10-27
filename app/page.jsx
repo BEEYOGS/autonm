@@ -95,6 +95,12 @@ function hexToHsv(hex) {
   return { hue: (hue + 360) % 360, saturation: maximum === 0 ? 0 : delta / maximum, value: maximum };
 }
 
+function applyCase(text, mode) {
+  if (mode === "upper") return String(text).toUpperCase();
+  if (mode === "lower") return String(text).toLowerCase();
+  return String(text);
+}
+
 function hsvToHex(hue, saturation, value) {
   const chroma = value * saturation;
   const secondary = chroma * (1 - Math.abs(((hue / 60) % 2) - 1));
@@ -258,13 +264,10 @@ async function readEntries(file) {
   if (nameColumns.length === 0) throw new Error('Tidak ditemukan kolom "Nama" pada baris pertama sheet Excel.');
   const entries = nameColumns.flatMap((columnIndex) => rows.slice(1).map((row) => ({
     name: String(row[columnIndex] || "").trim(),
-    number: String(row[columnIndex - 1] ?? "").trim(),
+    number: (columnIndex > 0 && /^\d+$/.test(String(row[columnIndex - 1] ?? "").trim())) ? String(row[columnIndex - 1]).trim() : "",
   })).filter((entry) => entry.name && entry.name.toLowerCase() !== "nama"))
     .sort((a, b) => Number(a.number) - Number(b.number));
-  if (entries.length === 0) throw new Error("Tidak ada nama yang dapat diproses pada file Excel.");
-  if (!entries.every((entry) => entry.number && Number.isFinite(Number(entry.number)))) {
-    throw new Error('Pastikan setiap nama memiliki nomor yang valid pada kolom "No".');
-  }
+
   return entries;
 }
 
@@ -298,6 +301,8 @@ export default function Home() {
   const [stickerHeight, setStickerHeight] = useState("2");
   const [stickerShape, setStickerShape] = useState("rounded");
   const [textAlign, setTextAlign] = useState("center");
+  const [numberingMode, setNumberingMode] = useState("with");
+  const [caseMode, setCaseMode] = useState("normal");
   const [stickers, setStickers] = useState([]);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState("idle");
@@ -340,18 +345,18 @@ export default function Home() {
   const [appAssets, setAppAssets] = useState([]);
   const [appLoading, setAppLoading] = useState(false);
   const [appError, setAppError] = useState("");
-  const [appDownloaded, setAppDownloaded] = useState(() => {
-    try { return window.localStorage.getItem("stikerin-app-downloaded-v1") === "true"; }
-    catch { return false; }
-  });
+  const [appDownloaded, setAppDownloaded] = useState(false);
   const [browserUrl, setBrowserUrl] = useState("");
   const [browserInput, setBrowserInput] = useState("");
   const [browserLoading, setBrowserLoading] = useState(false);
   const [browserError, setBrowserError] = useState("");
-  const [dismissedDownload, setDismissedDownload] = useState(() => {
-    try { return window.localStorage.getItem("stikerin-download-dismissed-v1") === "true"; }
-    catch { return false; }
-  });
+  const [dismissedDownload, setDismissedDownload] = useState(false);
+
+  useEffect(() => {
+    try { if (window.localStorage.getItem("stikerin-app-downloaded-v1") === "true") setAppDownloaded(true); } catch {}
+    try { if (window.localStorage.getItem("stikerin-download-dismissed-v1") === "true") setDismissedDownload(true); } catch {}
+    try { setIsBrowser(window.navigator.userAgent.includes("Electron")); } catch {}
+  }, []);
 
   function dismissDownload() {
     setShowDownloadNotice(false);
@@ -817,7 +822,11 @@ export default function Home() {
       try {
         for (let index = 0; index < entries.length; index += 1) {
           if (cancelled) return;
+          let finalNumber = "";
+          if (numberingMode === "with") finalNumber = entries[index].number;
+          else if (numberingMode === "auto") finalNumber = String(index + 1);
           const { name, number } = entries[index];
+          const label = finalNumber ? `${finalNumber}. ${applyCase(name, caseMode)}` : applyCase(name, caseMode);
           const canvas = document.createElement("canvas");
           canvas.width = Math.round((widthCm * PRINT_DPI) / 2.54);
           canvas.height = Math.round((heightCm * PRINT_DPI) / 2.54);
@@ -849,7 +858,7 @@ export default function Home() {
           context.fillStyle = textColor;
           context.textAlign = textAlign;
           context.textBaseline = "middle";
-          const label = `${number}. ${name}`;
+
           const maxFontSize = canvas.height * 0.322;
           const horizontalPadding = canvas.width * 0.094;
           const maxTextWidth = canvas.width - horizontalPadding * 2;
@@ -882,7 +891,7 @@ export default function Home() {
     }
     createStickers();
     return () => { cancelled = true; };
-  }, [entries, backgroundColor, textColor, stickerWidth, stickerHeight, stickerShape, textAlign, stickerBorder, stickerBorderColor, stickerBorderWidth]);
+  }, [entries, backgroundColor, textColor, stickerWidth, stickerHeight, stickerShape, textAlign, numberingMode, caseMode, stickerBorder, stickerBorderColor, stickerBorderWidth]);
 
   async function handleFile(file) {
     if (!file) return;
@@ -1049,7 +1058,7 @@ export default function Home() {
   }
 
   const isBusy = status === "processing" || status === "loading";
-  const isBrowser = typeof window !== "undefined" && window.navigator.userAgent.includes("Electron");
+  const [isBrowser, setIsBrowser] = useState(false);
   const showDownloadButton = !isBrowser && !appDownloaded && !dismissedDownload;
 
   return (
@@ -1251,7 +1260,7 @@ export default function Home() {
               </div>
               <input ref={fileInputRef} className="visually-hidden" type="file" accept=".xlsx,.xls"
                 onChange={(event) => { const file = event.target.files[0]; event.target.value = ""; handleFile(file); }} />
-              <div className="file-hint"><Icon name="check" size={14} /> Pastikan kolom <b>No</b> dan <b>Nama</b> ada di baris pertama</div>
+              <div className="file-hint"><Icon name="check" size={14} /> Pastikan kolom <b>Nama</b> ada di baris pertama</div>
               <div className="settings-divider" />
               <div className="settings-heading"><span className="settings-icon"><Icon name="spark" size={18} /></span>
                 <div><h3>Atur tampilan</h3><p>Pilih kombinasi warna favoritmu</p></div></div>
@@ -1281,6 +1290,22 @@ export default function Home() {
                   {[["left", "Kiri"], ["center", "Tengah"], ["right", "Kanan"]].map(([alignment, label]) => <button key={alignment}
                     type="button" className={textAlign === alignment ? "is-selected" : ""} aria-pressed={textAlign === alignment}
                     onClick={() => setTextAlign(alignment)}>{label}</button>)}</div></div>
+                <div className="option-row"><span className="option-label">Mode nomor</span><div className="segmented-control" role="group" aria-label="Mode nomor">
+                  {[
+                    ["with", "Pakai Nomor dari Excel"],
+                    ["auto", "Nomor Otomatis"],
+                    ["none", "Hanya Nama"]
+                  ].map(([value, label]) => <button key={value} type="button"
+                    className={numberingMode === value ? "is-selected" : ""} aria-pressed={numberingMode === value}
+                    onClick={() => setNumberingMode(value)}>{label}</button>)}</div></div>
+                <div className="option-row"><span className="option-label">Format nama</span><div className="segmented-control" role="group" aria-label="Format nama">
+                  {[
+                    ["normal", "Normal"],
+                    ["upper", "UPPERCASE"],
+                    ["lower", "lowercase"]
+                  ].map(([value, label]) => <button key={value} type="button"
+                    className={caseMode === value ? "is-selected" : ""} aria-pressed={caseMode === value}
+                    onClick={() => setCaseMode(value)}>{label}</button>)}</div></div>
                 <div className="option-row"><span className="option-label">Bingkai tepi</span>
                   <div className="segmented-control" role="group" aria-label="Bingkai stiker">
                     <button key="off" type="button"
