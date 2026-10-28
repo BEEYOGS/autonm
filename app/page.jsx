@@ -899,16 +899,14 @@ export default function Home() {
         context.textAlign = textAlign;
         context.textBaseline = "middle";
 
-        const fontSize = Math.min(canvas.height * 0.22, 42);
+        const fontSize = Math.min(canvas.height * 0.30, 55);
         const horizontalPadding = canvas.width * 0.08;
-        const verticalMargin = canvas.height * 0.06;
         const maxTextWidth = canvas.width - horizontalPadding * 2;
-        const maxLines = 12;
+        const maxLines = 3;
         const textX = textAlign === "left" ? horizontalPadding :
           textAlign === "right" ? canvas.width - horizontalPadding : canvas.width / 2;
 
-        const rawLines = [nameLabel];
-        if (partnerLabel) rawLines.push(partnerLabel);
+        const rawLines = partnerLabel ? [`${nameLabel} ${partnerLabel}`] : [nameLabel];
 
         context.font = `700 ${fontSize}px "Arial", "Microsoft YaHei", sans-serif`;
         const wrappedLines = [];
