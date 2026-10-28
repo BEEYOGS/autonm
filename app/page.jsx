@@ -294,9 +294,6 @@ async function readEntries(file) {
     if (String(header).trim().toLowerCase() === "nama") columns.push(index);
     return columns;
   }, []);
-  const genderColumn = (rows[0] || []).findIndex((header) =>
-    /^(gender|jenis ?kelamin|jk)$/i.test(String(header).trim())
-  );
   const partnerColumn = (rows[0] || []).findIndex((header) =>
     /^(pasangan|partner|istri|suami)$/i.test(String(header).trim())
   );
@@ -310,13 +307,11 @@ async function readEntries(file) {
       name = rawName.slice(0, slashIndex).trim();
       partnerFromName = rawName.slice(slashIndex + 1).trim();
     }
-    const gender = genderColumn >= 0 ? String(row[genderColumn] || "").trim() : "";
     const partner = partnerColumn >= 0 ? String(row[partnerColumn] || "").trim() : partnerFromName;
     return {
       rawName: rawName,
       name,
       number: (columnIndex > 0 && /^\d+$/.test(String(row[columnIndex - 1] ?? "").trim())) ? String(row[columnIndex - 1]).trim() : "",
-      gender,
       partner,
     };
   })).filter((entry) => entry.name && entry.name.toLowerCase() !== "nama")
@@ -866,18 +861,11 @@ export default function Home() {
         let finalNumber = "";
         if (numberingMode === "with") finalNumber = entries[index].number;
         else if (numberingMode === "auto") finalNumber = String(index + 1);
-        const { name, number: entryNumber, gender, partner } = entries[index];
+        const { name, number: entryNumber, partner } = entries[index];
         const nameLabel = finalNumber ? `${finalNumber}. ${applyCase(name, caseMode)}` : applyCase(name, caseMode);
         let partnerLabel = "";
         if (showPartner && partner) {
-          const g = gender.toLowerCase();
-          let title = partner;
-          if (genderColumn >= 0) {
-            title = "Partner";
-            if (/^(laki.?laki|l|pria|male)$/.test(g)) title = "Istri";
-            else if (/^(perempuan|wanita|p|cewek|female)$/.test(g)) title = "Suami";
-          }
-          partnerLabel = title ? applyCase(title, caseMode) : "";
+          partnerLabel = applyCase(partner, caseMode);
         }
         const canvas = document.createElement("canvas");
         canvas.width = Math.round((widthCm * PRINT_DPI) / 2.54);
