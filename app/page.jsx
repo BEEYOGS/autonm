@@ -350,6 +350,7 @@ export default function Home() {
   const [numberingMode, setNumberingMode] = useState("with");
   const [caseMode, setCaseMode] = useState("normal");
   const [showPartner, setShowPartner] = useState(false);
+  const [partnerLayout, setPartnerLayout] = useState("inline");
   const [stickers, setStickers] = useState([]);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState("idle");
@@ -906,7 +907,7 @@ export default function Home() {
         const textX = textAlign === "left" ? horizontalPadding :
           textAlign === "right" ? canvas.width - horizontalPadding : canvas.width / 2;
 
-        const rawLines = partnerLabel ? [`${nameLabel} ${partnerLabel}`] : [nameLabel];
+        const rawLines = partnerLabel ? (partnerLayout === "inline" ? [`${nameLabel} ${partnerLabel}`] : [nameLabel, partnerLabel]) : [nameLabel];
 
         context.font = `700 ${fontSize}px "Arial", "Microsoft YaHei", sans-serif`;
         const wrappedLines = [];
@@ -955,7 +956,7 @@ export default function Home() {
 
   useEffect(() => {
     regenerateStickers();
-  }, [entries, backgroundColor, textColor, stickerWidth, stickerHeight, stickerShape, textAlign, numberingMode, caseMode, showPartner, stickerBorder, stickerBorderColor, stickerBorderWidth]);
+  }, [entries, backgroundColor, textColor, stickerWidth, stickerHeight, stickerShape, textAlign, numberingMode, caseMode, showPartner, partnerLayout, stickerBorder, stickerBorderColor, stickerBorderWidth]);
 
   async function handleFile(file) {
     if (!file) return;
@@ -1373,6 +1374,13 @@ export default function Home() {
                   ].map(([value, label]) => <button key={value} type="button"
                     className={(showPartner && value === "on") || (!showPartner && value === "off") ? "is-selected" : ""} aria-pressed={showPartner === (value === "on")}
                     onClick={() => { setShowPartner(value === "on"); regenerateStickers(); }}>{label}</button>)}</div></div>
+                {showPartner && <div className="option-row"><span className="option-label">Layout</span><div className="segmented-control" role="group" aria-label="Layout pasangan">
+                  {[
+                    ["inline", "Sebaris"],
+                    ["block", "Berbaris"]
+                  ].map(([value, label]) => <button key={value} type="button"
+                    className={partnerLayout === value ? "is-selected" : ""} aria-pressed={partnerLayout === value}
+                    onClick={() => { setPartnerLayout(value); regenerateStickers(); }}>{label}</button>)}</div></div>}
                 <div className="option-row"><span className="option-label">Bingkai tepi</span>
                   <div className="segmented-control" role="group" aria-label="Bingkai stiker">
                     <button key="off" type="button"
