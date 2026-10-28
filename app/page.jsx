@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import JSZip from "jszip";
 import * as XLSX from "@e965/xlsx";
 
@@ -117,12 +118,13 @@ function hsvToHex(hue, saturation, value) {
 
 function ColorPicker({ label, value, onChange }) {
   const color = hexToHsv(value);
-  const [hue, setHue] = useState(color.hue);
   const [hexDraft, setHexDraft] = useState(value.toUpperCase());
+  const [open, setOpen] = useState(false);
   const [opensUp, setOpensUp] = useState(false);
+  const [panelPos, setPanelPos] = useState({ top: 0, left: 0 });
+  const pickerRef = useRef(null);
 
   useEffect(() => {
-    setHue(hexToHsv(value).hue);
     setHexDraft(value.toUpperCase());
   }, [value]);
 
@@ -130,112 +132,143 @@ function ColorPicker({ label, value, onChange }) {
     const bounds = event.currentTarget.getBoundingClientRect();
     const saturation = Math.max(0, Math.min(1, (event.clientX - bounds.left) / bounds.width));
     const brightness = 1 - Math.max(0, Math.min(1, (event.clientY - bounds.top) / bounds.height));
-    onChange(hsvToHex(hue, saturation, brightness));
+    onChange(hsvToHex(color.hue, saturation, brightness));
   }
 
   function updateColor(nextHue, saturation = color.saturation, brightness = color.value) {
-    setHue(nextHue);
     onChange(hsvToHex(nextHue, saturation, brightness));
   }
 
   function handleFieldKeyDown(event) {
     const step = event.shiftKey ? 0.1 : 0.025;
-    if (event.key === "ArrowLeft") updateColor(hue, color.saturation - step, color.value);
-    else if (event.key === "ArrowRight") updateColor(hue, color.saturation + step, color.value);
-    else if (event.key === "ArrowUp") updateColor(hue, color.saturation, color.value + step);
-    else if (event.key === "ArrowDown") updateColor(hue, color.saturation, color.value - step);
+    if (event.key === "ArrowLeft") updateColor(color.hue, color.saturation - step, color.value);
+    else if (event.key === "ArrowRight") updateColor(color.hue, color.saturation + step, color.value);
+    else if (event.key === "ArrowUp") updateColor(color.hue, color.saturation, color.value + step);
+    else if (event.key === "ArrowDown") updateColor(color.hue, color.saturation, color.value - step);
     else return;
     event.preventDefault();
   }
+
+  function handleToggle(event) {
+    const target = event.currentTarget;
+    if (!target.open) {
+      setOpen(false);
+      setOpensUp(false);
+      return;
+    }
+    setOpen(true);
+    const rect = target.getBoundingClientRect();
+    const panelHeight = 260;
+    const gap = 10;
+    const nextOpensUp = window.innerHeight - rect.bottom < panelHeight + gap;
+    setOpensUp(nextOpensUp);
+    setPanelPos({
+      top: nextOpensUp ? rect.top - panelHeight - gap : rect.bottom + gap,
+      left: rect.left,
+    });
+  }
+
+  function handleDocumentClick(event) {
+    if (open && pickerRef.current && !pickerRef.current.contains(event.target)) {
+      setOpen(false);
+    }
+  }
+
+  useEffect(() => {
+    document.addEventListener("mousedown", handleDocumentClick);
+    return () => document.removeEventListener("mousedown", handleDocumentClick);
+  }, [open]);
+
+  const panel = (
+    <div
+      ref={pickerRef}
+      className={`color-picker-panel ${opensUp ? "opens-up" : ""}`}
+      style={{ position: "fixed", top: panelPos.top, left: panelPos.left }}
+    >
+      <div
+        className="color-sv-field"
+        role="group"
+        aria-label={`${label}: atur saturasi dan kecerahan`}
+        tabIndex={0}
+        style={{ "--picker-hue": `hsl(${color.hue} 100% 50%)` }}
+        onPointerDown={(event) => {
+          event.preventDefault();
+          event.currentTarget.setPointerCapture(event.pointerId);
+          updateFromPointer(event);
+        }}
+        onPointerMove={(event) => { if (event.buttons) updateFromPointer(event); }}
+        onKeyDown={handleFieldKeyDown}
+      >
+        <span aria-hidden="true" />
+        <span
+          className="color-picker-indicator"
+          aria-hidden="true"
+          style={{
+            left: `${color.saturation * 100}%`,
+            top: `${(1 - color.value) * 100}%`,
+            backgroundColor: value,
+          }}
+        />
+      </div>
+      <label className="hue-control">
+        <span>Rona</span>
+        <input
+          type="range"
+          min="0"
+          max="359"
+          value={Math.round(color.hue)}
+          aria-label={`Rona ${label.toLowerCase()}`}
+          style={{ "--picker-current-color": value }}
+          onChange={(event) => updateColor(Number(event.target.value))}
+        />
+      </label>
+      <div className="color-picker-footer">
+        <span className="color-preview-swatch" style={{ backgroundColor: value }} aria-hidden="true" />
+        <label className="hex-control">
+          <span>HEX</span>
+          <input
+            value={hexDraft}
+            maxLength={7}
+            spellCheck={false}
+            aria-label={`Kode HEX ${label.toLowerCase()}`}
+            onChange={(event) => {
+              const nextValue = event.target.value.toUpperCase();
+              setHexDraft(nextValue);
+              if (/^#[0-9A-F]{6}$/.test(nextValue)) onChange(nextValue.toLowerCase());
+            }}
+            onBlur={() => setHexDraft(value.toUpperCase())}
+          />
+        </label>
+        <div className="color-presets" role="group" aria-label="Warna pilihan">
+          {["#FFFFFF", "#C4F27A", "#A78BFA", "#60A5FA", "#F472B6", "#F97316", "#EF4444", "#171321"].map((preset) => (
+            <button
+              key={preset}
+              type="button"
+              className={value.toUpperCase() === preset ? "is-selected" : ""}
+              style={{ backgroundColor: preset }}
+              aria-label={`Pilih warna ${preset}`}
+              title={preset}
+              onClick={() => { onChange(preset.toLowerCase()); setOpen(false); }}
+            />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
     <div className="color-control">
       <span className="color-label">{label}</span>
       <details
         className="color-picker"
-        onToggle={(event) => {
-          if (!event.currentTarget.open) {
-            setOpensUp(false);
-            return;
-          }
-          setOpensUp(window.innerHeight - event.currentTarget.getBoundingClientRect().bottom < 250);
-        }}
+        onToggle={handleToggle}
       >
         <summary className="color-picker-trigger" aria-label={`Pilih ${label.toLowerCase()}`}>
           <span className="color-swatch" style={{ backgroundColor: value }} />
           <code>{value.toUpperCase()}</code>
           <span className="color-chevron" aria-hidden="true" />
         </summary>
-        <div className={`color-picker-panel ${opensUp ? "opens-up" : ""}`}>
-          <div
-            className="color-sv-field"
-            role="group"
-            aria-label={`${label}: atur saturasi dan kecerahan`}
-            tabIndex={0}
-            style={{ "--picker-hue": `hsl(${hue} 100% 50%)` }}
-            onPointerDown={(event) => {
-              event.preventDefault();
-              event.currentTarget.setPointerCapture(event.pointerId);
-              updateFromPointer(event);
-            }}
-            onPointerMove={(event) => { if (event.buttons) updateFromPointer(event); }}
-            onKeyDown={handleFieldKeyDown}
-          >
-            <span aria-hidden="true" />
-            <span
-              className="color-picker-indicator"
-              aria-hidden="true"
-              style={{
-                left: `${color.saturation * 100}%`,
-                top: `${(1 - color.value) * 100}%`,
-                backgroundColor: value,
-              }}
-            />
-          </div>
-          <label className="hue-control">
-            <span>Rona</span>
-            <input
-              type="range"
-              min="0"
-              max="359"
-              value={Math.round(hue)}
-              aria-label={`Rona ${label.toLowerCase()}`}
-              style={{ "--picker-current-color": value }}
-              onChange={(event) => updateColor(Number(event.target.value))}
-            />
-          </label>
-          <div className="color-picker-footer">
-            <span className="color-preview-swatch" style={{ backgroundColor: value }} aria-hidden="true" />
-            <label className="hex-control">
-              <span>HEX</span>
-              <input
-                value={hexDraft}
-                maxLength={7}
-                spellCheck={false}
-                aria-label={`Kode HEX ${label.toLowerCase()}`}
-                onChange={(event) => {
-                  const nextValue = event.target.value.toUpperCase();
-                  setHexDraft(nextValue);
-                  if (/^#[0-9A-F]{6}$/.test(nextValue)) onChange(nextValue.toLowerCase());
-                }}
-                onBlur={() => setHexDraft(value.toUpperCase())}
-              />
-            </label>
-            <div className="color-presets" role="group" aria-label="Warna pilihan">
-              {["#FFFFFF", "#C4F27A", "#A78BFA", "#60A5FA", "#F472B6", "#F97316", "#EF4444", "#171321"].map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  className={value.toUpperCase() === preset ? "is-selected" : ""}
-                  style={{ backgroundColor: preset }}
-                  aria-label={`Pilih warna ${preset}`}
-                  title={preset}
-                  onClick={() => onChange(preset.toLowerCase())}
-                />
-              ))}
-            </div>
-          </div>
-        </div>
+        {open && createPortal(panel, document.body)}
       </details>
     </div>
   );
