@@ -302,10 +302,19 @@ async function readEntries(file) {
   );
   if (nameColumns.length === 0) throw new Error('Tidak ditemukan kolom "Nama" pada baris pertama sheet Excel.');
   const entries = nameColumns.flatMap((columnIndex) => rows.slice(1).map((row) => {
+    const rawName = String(row[columnIndex] || "").trim();
+    let name = rawName;
+    let partnerFromName = "";
+    const slashIndex = rawName.indexOf("/");
+    if (slashIndex >= 0) {
+      name = rawName.slice(0, slashIndex).trim();
+      partnerFromName = rawName.slice(slashIndex + 1).trim();
+    }
     const gender = genderColumn >= 0 ? String(row[genderColumn] || "").trim() : "";
-    const partner = partnerColumn >= 0 ? String(row[partnerColumn] || "").trim() : "";
+    const partner = partnerColumn >= 0 ? String(row[partnerColumn] || "").trim() : partnerFromName;
     return {
-      name: String(row[columnIndex] || "").trim(),
+      rawName: rawName,
+      name,
       number: (columnIndex > 0 && /^\d+$/.test(String(row[columnIndex - 1] ?? "").trim())) ? String(row[columnIndex - 1]).trim() : "",
       gender,
       partner,
@@ -862,10 +871,13 @@ export default function Home() {
         let partnerLabel = "";
         if (showPartner && partner) {
           const g = gender.toLowerCase();
-          let title = "Partner";
-          if (/^(laki.?laki|l|pria|male)$/.test(g)) title = "Istri";
-          else if (/^(perempuan|wanita|p|cewek|female)$/.test(g)) title = "Suami";
-          partnerLabel = `${title}: ${applyCase(partner, caseMode)}`;
+          let title = partner;
+          if (genderColumn >= 0) {
+            title = "Partner";
+            if (/^(laki.?laki|l|pria|male)$/.test(g)) title = "Istri";
+            else if (/^(perempuan|wanita|p|cewek|female)$/.test(g)) title = "Suami";
+          }
+          partnerLabel = title ? applyCase(title, caseMode) : "";
         }
         const canvas = document.createElement("canvas");
         canvas.width = Math.round((widthCm * PRINT_DPI) / 2.54);
@@ -904,16 +916,39 @@ export default function Home() {
         const maxTextWidth = canvas.width - horizontalPadding * 2;
         const textX = textAlign === "left" ? horizontalPadding :
           textAlign === "right" ? canvas.width - horizontalPadding : canvas.width / 2;
+
+        const rawLines = [nameLabel];
+        if (partnerLabel) rawLines.push(partnerLabel);
+
         context.font = `700 ${maxFontSize}px "Arial", "Microsoft YaHei", sans-serif`;
-        const measuredWidth = context.measureText(nameLabel).width;
-        const fontSize = measuredWidth > maxTextWidth ? (maxFontSize * maxTextWidth) / measuredWidth : maxFontSize;
+        const wrappedLines = [];
+        for (const raw of rawLines) {
+          const words = String(raw).split(/\s+/);
+          let current = "";
+          for (const word of words) {
+            const test = current ? `${current} ${word}` : word;
+            if (context.measureText(test).width > maxTextWidth && current) {
+              wrappedLines.push(current);
+              current = word;
+            } else {
+              current = test;
+            }
+          }
+          if (current) wrappedLines.push(current);
+        }
+
+        let maxLineWidth = 0;
+        for (const line of wrappedLines) {
+          maxLineWidth = Math.max(maxLineWidth, context.measureText(line).width);
+        }
+        const fontSize = maxLineWidth > maxTextWidth ? (maxFontSize * maxTextWidth) / maxLineWidth : maxFontSize;
         context.font = `700 ${fontSize}px "Arial", "Microsoft YaHei", sans-serif`;
+
         const lineHeight = fontSize * 1.25;
-        const startY = canvas.height / 2 - (partnerLabel ? lineHeight / 2 : 0);
-        context.fillText(nameLabel, textX, startY);
-        if (partnerLabel) {
-          context.font = `700 ${fontSize * 0.6}px "Arial", "Microsoft YaHei", sans-serif`;
-          context.fillText(partnerLabel, textX, startY + lineHeight);
+        const totalHeight = wrappedLines.length * lineHeight;
+        const startY = canvas.height / 2 - totalHeight / 2 + lineHeight / 2;
+        for (let i = 0; i < wrappedLines.length; i += 1) {
+          context.fillText(wrappedLines[i], textX, startY + i * lineHeight);
         }
         const canvasBlob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
         if (!canvasBlob) throw new Error(`Gagal membuat gambar untuk nama "${name}".`);
