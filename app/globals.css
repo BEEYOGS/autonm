@@ -14,8 +14,11 @@
   --purple-glow: #7c3aed;
   --green: #c4f27a;
   --green-dark: #65a30d;
-  --danger: #ff9d9d;
+  --cyan: #22d3ee;
+  --cyan-glow: #0891b2;
+  --rose: #fb7185;
   --amber: #fbbf24;
+  --danger: #ff9d9d;
   --radius: 16px;
   --radius-sm: 10px;
   --radius-lg: 24px;
@@ -193,6 +196,21 @@ body {
   background: linear-gradient(160deg, rgba(167, 139, 250, 0.22), rgba(124, 58, 237, 0.14));
   color: #f7f5ff;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+.tool-switcher button.is-active[data-tool="stickers"] {
+  background: linear-gradient(160deg, rgba(196, 242, 122, 0.25), rgba(101, 163, 13, 0.14));
+  color: #e8fdd0;
+  box-shadow: 0 2px 8px rgba(196, 242, 122, 0.3);
+}
+.tool-switcher button.is-active[data-tool="qr"] {
+  background: linear-gradient(160deg, rgba(34, 211, 238, 0.25), rgba(8, 145, 178, 0.14));
+  color: #ecfeff;
+  box-shadow: 0 2px 8px rgba(34, 211, 238, 0.3);
+}
+.tool-switcher button.is-active[data-tool="browser"] {
+  background: linear-gradient(160deg, rgba(251, 113, 133, 0.25), rgba(225, 29, 72, 0.14));
+  color: #fff1f2;
+  box-shadow: 0 2px 8px rgba(251, 113, 133, 0.3);
 }
 .tool-switcher button.is-active::before {
   content: "";
@@ -531,18 +549,24 @@ body {
 .dimension-input {
   height: 38px; padding: 0 10px;
   display: flex; align-items: center; gap: 7px;
-  border-radius: 9px; background: #15121d;
-  transition: all 160ms ease;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  transition: all var(--transition);
 }
-.dimension-input:focus-within { box-shadow: 0 0 0 2px rgb(167 139 250 / 14%); }
+.dimension-input:focus-within {
+  border-color: var(--purple);
+  background: rgba(167, 139, 250, 0.06);
+  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.18);
+}
 .dimension-input input {
   width: 100%; min-width: 0; padding: 0; border: 0; outline: 0;
-  color: #e2dce9; background: transparent; font-size: 11px; font-weight: 600;
+  color: var(--ink); background: transparent; font-size: 11px; font-weight: 600;
 }
 .dimension-input input::-webkit-inner-spin-button,
 .dimension-input input::-webkit-outer-spin-button { margin: 0; appearance: none; }
 .dimension-input input[type="number"] { appearance: textfield; }
-.dimension-input > span, .dimension-times { color: #a59bb7; font-size: 9px; }
+.dimension-input > span, .dimension-times { color: var(--muted); font-size: 9px; }
 .dimension-times { padding-bottom: 12px; text-align: center; }
 .option-row {
   min-height: 40px; margin-top: 11px;
@@ -550,20 +574,25 @@ body {
 }
 .segmented-control {
   padding: 4px; display: inline-flex; gap: 3px;
-  border-radius: 9px; background: #15121d;
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
 }
 .segmented-control button {
-  min-width: 56px; min-height: 30px; padding: 0 10px;
-  border: 0; border-radius: 6px; background: transparent;
-  color: var(--muted); cursor: pointer; font-size: 9px; font-weight: 600;
-  transition: all 150ms ease;
+  min-width: 56px; min-height: 32px; padding: 0 12px;
+  border: 0; border-radius: 8px; background: transparent;
+  color: var(--muted); cursor: pointer; font-size: 10.5px; font-weight: 600;
+  transition: all var(--transition);
 }
 @media (hover: hover) and (pointer: fine) {
-  .segmented-control button:hover:not(.is-selected) { background: #251d34; color: #e0d2ff; }
+  .segmented-control button:hover:not(.is-selected) { color: var(--ink); background: rgba(255, 255, 255, 0.05); }
 }
 .segmented-control button.is-selected {
-  background: #3a2d52; color: #d4c5ff;
-  box-shadow: inset 0 0 0 1px #594476;
+  background: linear-gradient(160deg, rgba(167, 139, 250, 0.25), rgba(124, 58, 237, 0.15));
+  color: #f7f5ff;
+  box-shadow: 0 2px 8px rgba(124, 58, 237, 0.3);
 }
 .align-control button { min-width: 48px; }
 
@@ -1267,14 +1296,25 @@ kbd {
 .badge.blue { border-color: #3b5bdb; color: #93c5fd; }
 
 /* ---------- Input / select enhancements ---------- */
-.input-field {
-  width: 100%; min-height: 42px; padding: 0 12px;
-  border-radius: 10px;
-  background: #15121d; color: var(--ink);
-  font-size: 11px; transition: all 160ms ease;
+.input-field, .dimension-input, .editor-select, .hex-control input {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 11px;
+  background: rgba(255, 255, 255, 0.03);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  transition: all var(--transition);
+  outline: none;
 }
-.input-field:focus-visible { box-shadow: 0 0 0 2px rgb(167 139 250 / 14%); }
-.input-field::placeholder { color: #574c6d; }
+.input-field:focus-visible, .dimension-input:focus-within, .editor-select:focus-visible, .hex-control input:focus-visible {
+  border-color: var(--purple);
+  background: rgba(167, 139, 250, 0.06);
+  box-shadow: 0 0 0 3px rgba(167, 139, 250, 0.18);
+}
+.input-field::placeholder { color: var(--muted); }
 
 .field-group { display: grid; gap: 7px; margin-bottom: 14px; }
 .field-label { color: var(--muted); font-size: 9.5px; font-weight: 600; letter-spacing: .3px; }
@@ -1509,9 +1549,9 @@ html[data-theme="light"] .desktop-download-link:hover { background: #e0d8f0; col
 
 .setup-card, .preview-panel, .editor-card, .asset-search-panel {
   min-width: 0;
-  padding: 26px;
+  padding: 28px;
   border-radius: var(--radius-lg);
-  background: linear-gradient(160deg, rgba(20, 19, 31, 0.85), rgba(12, 11, 20, 0.85));
+  background: linear-gradient(160deg, rgba(20, 19, 31, 0.88), rgba(12, 11, 20, 0.88));
   backdrop-filter: blur(20px) saturate(140%);
   -webkit-backdrop-filter: blur(20px) saturate(140%);
   border: 1px solid rgba(255, 255, 255, 0.06);
@@ -1520,12 +1560,14 @@ html[data-theme="light"] .desktop-download-link:hover { background: #e0d8f0; col
     0 24px 60px rgba(0, 0, 0, 0.45);
   transition: all var(--transition);
 }
-.setup-card:hover, .preview-panel:hover, .editor-card:hover {
-  border-color: rgba(167, 139, 250, 0.4);
-  transform: translateY(-2px);
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.06) inset,
-    0 30px 80px rgba(124, 58, 237, 0.25);
+@media (hover: hover) and (pointer: fine) {
+  .setup-card:hover, .preview-panel:hover, .editor-card:hover {
+    border-color: rgba(167, 139, 250, 0.4);
+    transform: translateY(-2px);
+    box-shadow:
+      0 1px 0 rgba(255, 255, 255, 0.06) inset,
+      0 30px 80px rgba(124, 58, 237, 0.25);
+  }
 }
 .hover-lift {
   transition: transform var(--transition), box-shadow var(--transition), border-color var(--transition);
