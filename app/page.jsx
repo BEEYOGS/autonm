@@ -866,7 +866,7 @@ export default function Home() {
         const nameLabel = finalNumber ? `${finalNumber}. ${applyCase(name, caseMode)}` : applyCase(name, caseMode);
         let partnerLabel = "";
         if (showPartner && partner) {
-          partnerLabel = "/" + applyCase(partner, caseMode);
+          partnerLabel = "/" + " " + applyCase(partner, caseMode);
         }
         const canvas = document.createElement("canvas");
         canvas.width = Math.round((widthCm * PRINT_DPI) / 2.54);
