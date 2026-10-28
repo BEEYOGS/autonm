@@ -294,10 +294,22 @@ async function readEntries(file) {
     if (String(header).trim().toLowerCase() === "nama") columns.push(index);
     return columns;
   }, []);
+  const genderColumn = (rows[0] || []).findIndex((header) =>
+    /^(gender|jenis ?kelamin|jk)$/i.test(String(header).trim())
+  );
+  const partnerColumn = (rows[0] || []).findIndex((header) =>
+    /^(pasangan|partner|istri|suami)$/i.test(String(header).trim())
+  );
   if (nameColumns.length === 0) throw new Error('Tidak ditemukan kolom "Nama" pada baris pertama sheet Excel.');
-  const entries = nameColumns.flatMap((columnIndex) => rows.slice(1).map((row) => ({
-    name: String(row[columnIndex] || "").trim(),
-    number: (columnIndex > 0 && /^\d+$/.test(String(row[columnIndex - 1] ?? "").trim())) ? String(row[columnIndex - 1]).trim() : "",
+  const entries = nameColumns.flatMap((columnIndex) => rows.slice(1).map((row) => {
+    const gender = genderColumn >= 0 ? String(row[genderColumn] || "").trim() : "";
+    const partner = partnerColumn >= 0 ? String(row[partnerColumn] || "").trim() : "";
+    return {
+      name: String(row[columnIndex] || "").trim(),
+      number: (columnIndex > 0 && /^\d+$/.test(String(row[columnIndex - 1] ?? "").trim())) ? String(row[columnIndex - 1]).trim() : "",
+      gender,
+      partner,
+    };
   })).filter((entry) => entry.name && entry.name.toLowerCase() !== "nama"))
     .sort((a, b) => Number(a.number) - Number(b.number));
 
@@ -333,6 +345,7 @@ export default function Home() {
   const [textAlign, setTextAlign] = useState("center");
   const [numberingMode, setNumberingMode] = useState("with");
   const [caseMode, setCaseMode] = useState("normal");
+  const [showPartner, setShowPartner] = useState(false);
   const [stickers, setStickers] = useState([]);
   const [progress, setProgress] = useState(0);
   const [status, setStatus] = useState("idle");
@@ -844,8 +857,16 @@ export default function Home() {
         let finalNumber = "";
         if (numberingMode === "with") finalNumber = entries[index].number;
         else if (numberingMode === "auto") finalNumber = String(index + 1);
-        const { name } = entries[index];
-        const label = finalNumber ? `${finalNumber}. ${applyCase(name, caseMode)}` : applyCase(name, caseMode);
+        const { name, number: entryNumber, gender, partner } = entries[index];
+        const nameLabel = finalNumber ? `${finalNumber}. ${applyCase(name, caseMode)}` : applyCase(name, caseMode);
+        let partnerLabel = "";
+        if (showPartner && partner) {
+          const g = gender.toLowerCase();
+          let title = "Partner";
+          if (/^(laki.?laki|l|pria|male)$/.test(g)) title = "Istri";
+          else if (/^(perempuan|wanita|p|cewek|female)$/.test(g)) title = "Suami";
+          partnerLabel = `${title}: ${applyCase(partner, caseMode)}`;
+        }
         const canvas = document.createElement("canvas");
         canvas.width = Math.round((widthCm * PRINT_DPI) / 2.54);
         canvas.height = Math.round((heightCm * PRINT_DPI) / 2.54);
@@ -884,10 +905,16 @@ export default function Home() {
         const textX = textAlign === "left" ? horizontalPadding :
           textAlign === "right" ? canvas.width - horizontalPadding : canvas.width / 2;
         context.font = `700 ${maxFontSize}px "Arial", "Microsoft YaHei", sans-serif`;
-        const measuredWidth = context.measureText(label).width;
+        const measuredWidth = context.measureText(nameLabel).width;
         const fontSize = measuredWidth > maxTextWidth ? (maxFontSize * maxTextWidth) / measuredWidth : maxFontSize;
         context.font = `700 ${fontSize}px "Arial", "Microsoft YaHei", sans-serif`;
-        context.fillText(label, textX, canvas.height / 2);
+        const lineHeight = fontSize * 1.25;
+        const startY = canvas.height / 2 - (partnerLabel ? lineHeight / 2 : 0);
+        context.fillText(nameLabel, textX, startY);
+        if (partnerLabel) {
+          context.font = `700 ${fontSize * 0.6}px "Arial", "Microsoft YaHei", sans-serif`;
+          context.fillText(partnerLabel, textX, startY + lineHeight);
+        }
         const canvasBlob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
         if (!canvasBlob) throw new Error(`Gagal membuat gambar untuk nama "${name}".`);
         const stickerBlob = await addPngResolution(canvasBlob, PRINT_DPI);
@@ -911,7 +938,7 @@ export default function Home() {
 
   useEffect(() => {
     regenerateStickers();
-  }, [entries, backgroundColor, textColor, stickerWidth, stickerHeight, stickerShape, textAlign, numberingMode, caseMode, stickerBorder, stickerBorderColor, stickerBorderWidth]);
+  }, [entries, backgroundColor, textColor, stickerWidth, stickerHeight, stickerShape, textAlign, numberingMode, caseMode, showPartner, stickerBorder, stickerBorderColor, stickerBorderWidth]);
 
   async function handleFile(file) {
     if (!file) return;
@@ -1322,6 +1349,13 @@ export default function Home() {
                   ].map(([value, label]) => <button key={value} type="button"
                     className={caseMode === value ? "is-selected" : ""} aria-pressed={caseMode === value}
                     onClick={() => { setCaseMode(value); regenerateStickers(); }}>{label}</button>)}</div></div>
+                <div className="option-row"><span className="option-label">Pasangan</span><div className="segmented-control" role="group" aria-label="Tampilkan pasangan">
+                  {[
+                    ["off", "Off"],
+                    ["on", "On"]
+                  ].map(([value, label]) => <button key={value} type="button"
+                    className={(showPartner && value === "on") || (!showPartner && value === "off") ? "is-selected" : ""} aria-pressed={showPartner === (value === "on")}
+                    onClick={() => { setShowPartner(value === "on"); regenerateStickers(); }}>{label}</button>)}</div></div>
                 <div className="option-row"><span className="option-label">Bingkai tepi</span>
                   <div className="segmented-control" role="group" aria-label="Bingkai stiker">
                     <button key="off" type="button"
