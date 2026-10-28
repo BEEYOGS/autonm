@@ -319,7 +319,7 @@ async function readEntries(file) {
       gender,
       partner,
     };
-  })).filter((entry) => entry.name && entry.name.toLowerCase() !== "nama"))
+  })).filter((entry) => entry.name && entry.name.toLowerCase() !== "nama")
     .sort((a, b) => Number(a.number) - Number(b.number));
 
   return entries;
