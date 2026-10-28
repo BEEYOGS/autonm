@@ -219,7 +219,6 @@ body {
 .setup-card, .preview-panel, .editor-card, .asset-search-panel {
   min-width: 0;
   padding: 26px;
-  border: 1px solid #30283d;
   border-radius: var(--radius-lg);
   background: linear-gradient(180deg, #1b1725, #13101c);
   box-shadow: var(--shadow);
@@ -240,7 +239,6 @@ body {
 }
 .step-pill {
   padding: 6px 10px;
-  border: 1px solid #3a3248;
   border-radius: 8px;
   color: #988da8;
   font-size: 10px; font-weight: 600;
@@ -447,7 +445,7 @@ body {
 }
 
 /* ---------- Sticker settings ---------- */
-.sticker-settings { margin-top: 18px; padding-top: 16px; border-top: 1px solid #2a243a; }
+.sticker-settings { margin-top: 18px; padding-top: 16px; }
 .sticker-settings-title {
   display: flex; align-items: center; justify-content: space-between;
   color: var(--muted); font-size: 10px; font-weight: 600;
@@ -520,7 +518,7 @@ body {
 .status-chip {
   padding: 8px 11px;
   display: inline-flex; align-items: center; gap: 8px;
-  border: 1px solid #3b3349; border-radius: 999px;
+  border-radius: 999px;
   color: var(--muted); font-size: 9px; font-weight: 600; white-space: nowrap;
 }
 .status-chip > span { width: 7px; height: 7px; border-radius: 50%; background: #6d6479; }
@@ -534,7 +532,7 @@ body {
 .sticker-stage {
   flex: 1; min-height: 260px; margin-top: 22px; padding: 24px;
   display: grid; place-items: center; overflow: hidden;
-  border: 1px solid #342b43; border-radius: 14px;
+  border-radius: 14px;
   background-color: #15121d;
   background-image: radial-gradient(#3a3247 .75px, transparent .75px);
   background-size: 14px 14px;
@@ -1275,7 +1273,7 @@ html[data-theme="light"] .color-sv-field { border-color: rgb(0 0 0 / 12%); }
 html[data-theme="light"] .size-note { background: #f0ecf7; }
 html[data-theme="light"] .size-tag { background: #e0d8f0; color: #4c1d95; }
 html[data-theme="light"] .status-chip { border-color: #c4b5e8; color: #6b6380; }
-html[data-theme="light"] .status-chip.is-ready { background: #ede6f7; color: #4c1d95; border-color: #a78bfa; }
+html[data-theme="light"] .status-chip.is-ready { background: #ede6f7; color: #4c1d95; }
 html[data-theme="light"] .empty-preview strong, html[data-theme="light"] .empty-editor strong, html[data-theme="light"] .asset-empty strong { color: #1a1625; }
 html[data-theme="light"] .empty-preview > span:last-child, html[data-theme="light"] .empty-editor > span:last-child, html[data-theme="light"] .asset-empty > span:last-child { color: #6b6380; }
 html[data-theme="light"] .empty-art-back, html[data-theme="light"] .empty-art-front { border-color: #c4b5e8; background: #f0ecf7; }
@@ -1304,7 +1302,7 @@ html[data-theme="light"] .eyebrow > span { background: var(--green); box-shadow:
 html[data-theme="light"] .hero > p, html[data-theme="light"] .tool-page-heading > p { color: #6b6380; }
 html[data-theme="light"] .hero h1, html[data-theme="light"] .tool-page-heading h1 { color: #1a1625; }
 html[data-theme="light"] .section-heading h2, html[data-theme="light"] .preview-heading h2, html[data-theme="light"] .results-heading h2, html[data-theme="light"] .image-tool-title h2 { color: #1a1625; }
-html[data-theme="light"] .step-pill { border-color: #c4b5e8; color: #6b6380; }
+html[data-theme="light"] .step-pill { color: #6b6380; }
 html[data-theme="light"] .step-pill span { color: #1a1625; }
 html[data-theme="light"] .upload-icon, html[data-theme="light"] .settings-icon, html[data-theme="light"] .counter-icon { background: #ede6f7; color: #7c3aed; }
 html[data-theme="light"] .drop-copy strong { color: #1a1625; }
