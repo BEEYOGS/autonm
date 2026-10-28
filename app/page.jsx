@@ -911,16 +911,18 @@ export default function Home() {
         context.textAlign = textAlign;
         context.textBaseline = "middle";
 
-        const maxFontSize = canvas.height * 0.322;
-        const horizontalPadding = canvas.width * 0.094;
+        const fontSize = Math.min(canvas.height * 0.22, 42);
+        const horizontalPadding = canvas.width * 0.08;
+        const verticalMargin = canvas.height * 0.06;
         const maxTextWidth = canvas.width - horizontalPadding * 2;
+        const maxLines = 12;
         const textX = textAlign === "left" ? horizontalPadding :
           textAlign === "right" ? canvas.width - horizontalPadding : canvas.width / 2;
 
         const rawLines = [nameLabel];
         if (partnerLabel) rawLines.push(partnerLabel);
 
-        context.font = `700 ${maxFontSize}px "Arial", "Microsoft YaHei", sans-serif`;
+        context.font = `700 ${fontSize}px "Arial", "Microsoft YaHei", sans-serif`;
         const wrappedLines = [];
         for (const raw of rawLines) {
           const words = String(raw).split(/\s+/);
@@ -937,18 +939,12 @@ export default function Home() {
           if (current) wrappedLines.push(current);
         }
 
-        let maxLineWidth = 0;
-        for (const line of wrappedLines) {
-          maxLineWidth = Math.max(maxLineWidth, context.measureText(line).width);
-        }
-        const fontSize = maxLineWidth > maxTextWidth ? (maxFontSize * maxTextWidth) / maxLineWidth : maxFontSize;
-        context.font = `700 ${fontSize}px "Arial", "Microsoft YaHei", sans-serif`;
-
-        const lineHeight = fontSize * 1.25;
-        const totalHeight = wrappedLines.length * lineHeight;
+        const truncatedLines = wrappedLines.slice(0, maxLines);
+        const lineHeight = fontSize * 1.3;
+        const totalHeight = truncatedLines.length * lineHeight;
         const startY = canvas.height / 2 - totalHeight / 2 + lineHeight / 2;
-        for (let i = 0; i < wrappedLines.length; i += 1) {
-          context.fillText(wrappedLines[i], textX, startY + i * lineHeight);
+        for (let i = 0; i < truncatedLines.length; i += 1) {
+          context.fillText(truncatedLines[i], textX, startY + i * lineHeight);
         }
         const canvasBlob = await new Promise((resolve) => canvas.toBlob(resolve, "image/png"));
         if (!canvasBlob) throw new Error(`Gagal membuat gambar untuk nama "${name}".`);
